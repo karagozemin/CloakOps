@@ -1,5 +1,25 @@
 import type { Address, PublicClient } from "viem";
 import { getContractConfig } from "@/lib/contracts";
+import { confidentialTokenAbi } from "./confidential-token-abi";
+
+/** Reads the encrypted confidential-token balance handle for `account`. */
+export async function readConfidentialBalance(
+  publicClient: PublicClient,
+  tokenAddress: Address,
+  account: Address,
+): Promise<`0x${string}` | null> {
+  try {
+    const handle = (await publicClient.readContract({
+      address: tokenAddress,
+      abi: confidentialTokenAbi,
+      functionName: "confidentialBalanceOf",
+      args: [account],
+    })) as `0x${string}`;
+    return handle;
+  } catch {
+    return null;
+  }
+}
 
 export async function readRecipientHandles(
   publicClient: PublicClient,
@@ -109,6 +129,84 @@ export async function readCampaignCount(
     return Number(count);
   } catch {
     return 0;
+  }
+}
+
+export async function readAllPublicCampaigns(
+  publicClient: PublicClient,
+): Promise<{ campaignId: number; campaign: OnChainPublicCampaign }[]> {
+  const cfg = getContractConfig();
+  if (!cfg) return [];
+
+  const count = await readCampaignCount(publicClient);
+  if (count <= 0) return [];
+
+  const ids = Array.from({ length: count }, (_, i) => BigInt(i + 1));
+  const results = await publicClient.multicall({
+    contracts: ids.map((id) => ({
+      ...cfg,
+      functionName: "getPublicCampaign" as const,
+      args: [id] as const,
+    })),
+  });
+
+  const out: { campaignId: number; campaign: OnChainPublicCampaign }[] = [];
+  results.forEach((r, i) => {
+    if (r.status === "success" && r.result) {
+      const c = r.result as OnChainPublicCampaign;
+      if (c.exists) out.push({ campaignId: Number(ids[i]), campaign: c });
+    }
+  });
+  return out;
+}
+
+/**
+ * Recipient addresses are public but not enumerable via a view function, so we
+ * read them from `RecipientAdded` event logs and check claim status per address.
+ * Degrades gracefully (returns []) if the RPC rejects the log range.
+ */
+export async function readCampaignRecipients(
+  publicClient: PublicClient,
+  campaignId: bigint,
+): Promise<{ wallet: Address; claimed: boolean }[]> {
+  const cfg = getContractConfig();
+  if (!cfg) return [];
+
+  try {
+    const logs = await publicClient.getContractEvents({
+      ...cfg,
+      eventName: "RecipientAdded",
+      args: { campaignId },
+      fromBlock: "earliest",
+      toBlock: "latest",
+    });
+
+    const wallets = Array.from(
+      new Set(
+        logs
+          .map((l) => (l.args as { recipient?: Address }).recipient)
+          .filter((w): w is Address => Boolean(w)),
+      ),
+    );
+    if (wallets.length === 0) return [];
+
+    const claimedResults = await publicClient.multicall({
+      contracts: wallets.map((w) => ({
+        ...cfg,
+        functionName: "hasClaimed" as const,
+        args: [campaignId, w] as const,
+      })),
+    });
+
+    return wallets.map((wallet, i) => ({
+      wallet,
+      claimed:
+        claimedResults[i]?.status === "success"
+          ? Boolean(claimedResults[i].result)
+          : false,
+    }));
+  } catch {
+    return [];
   }
 }
 

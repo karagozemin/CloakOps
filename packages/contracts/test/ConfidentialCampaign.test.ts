@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers, fhevm } from "hardhat";
 import { FhevmType } from "@fhevm/hardhat-plugin";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { ConfidentialCampaign, MockConfidentialToken } from "../typechain-types";
+import { ConfidentialCampaign, CloakConfidentialToken } from "../typechain-types";
 
 const CampaignType = {
   PrivateRound: 0,
@@ -18,7 +18,7 @@ async function now(): Promise<number> {
 
 describe("ConfidentialCampaign", () => {
   let campaign: ConfidentialCampaign;
-  let token: MockConfidentialToken;
+  let token: CloakConfidentialToken;
   let contractAddress: string;
   let admin: HardhatEthersSigner;
   let alice: HardhatEthersSigner; // recipient
@@ -28,8 +28,8 @@ describe("ConfidentialCampaign", () => {
   beforeEach(async () => {
     [admin, alice, bob, mallory] = await ethers.getSigners();
 
-    const Token = await ethers.getContractFactory("MockConfidentialToken");
-    token = await Token.deploy("Demo Token", "DEMO", 18, ethers.parseEther("1000000"));
+    const Token = await ethers.getContractFactory("CloakConfidentialToken");
+    token = await Token.deploy("CloakOps Confidential Token", "cCLOAK");
     await token.waitForDeployment();
 
     const Campaign = await ethers.getContractFactory("ConfidentialCampaign");
@@ -229,6 +229,25 @@ describe("ConfidentialCampaign", () => {
 
       const c = await campaign.getPublicCampaign(id);
       expect(c.claimedCount).to.eq(1n);
+    });
+
+    it("credits the recipient's confidential token balance on claim", async () => {
+      const id = await createCampaign();
+      await addRecipient(id, alice.address, 25_000, 2, 1);
+
+      await (await campaign.connect(alice).claim(id)).wait();
+
+      // The payout amount is credited via on-chain FHE.add and stays encrypted;
+      // only the recipient can decrypt their resulting balance.
+      const tokenAddress = await token.getAddress();
+      const encBalance = await token.confidentialBalanceOf(alice.address);
+      const clearBalance = await fhevm.userDecryptEuint(
+        FhevmType.euint64,
+        encBalance,
+        tokenAddress,
+        alice,
+      );
+      expect(clearBalance).to.eq(25_000n);
     });
 
     it("rejects claims from non-eligible accounts", async () => {

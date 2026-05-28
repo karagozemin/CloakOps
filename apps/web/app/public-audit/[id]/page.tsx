@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
 import { PublicSummary } from "@/components/campaign/public-summary";
-import { useCampaign } from "@/lib/campaigns/hooks";
+import { useCampaignOrChain } from "@/lib/campaigns/onchain";
 import { explorerAddress, hasLiveContractAddressNote } from "@/lib/config";
 import { shortAddress } from "@/lib/utils";
 import { CLOAKOPS_CONTRACT_ADDRESS } from "@/lib/config";
@@ -37,7 +37,15 @@ const PUBLIC_FIELDS = [
 export default function PublicAuditPage() {
   const params = useParams();
   const id = String(params.id);
-  const campaign = useCampaign(id);
+  const { campaign, loading } = useCampaignOrChain(id);
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        <PageHeader eyebrow="Public audit" title="Loading campaign…" />
+      </div>
+    );
+  }
 
   if (!campaign) {
     return (

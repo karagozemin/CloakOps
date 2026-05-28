@@ -4,6 +4,10 @@ pragma solidity ^0.8.27;
 import {FHE, euint64, euint8, externalEuint64, externalEuint8} from "@fhevm/solidity/lib/FHE.sol";
 import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 
+interface ICloakConfidentialToken {
+    function creditConfidential(address to, euint64 amount) external;
+}
+
 /// @title ConfidentialCampaign
 /// @notice CloakOps confidential token-distribution campaigns built on Zama FHE.
 ///
@@ -29,11 +33,11 @@ import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 ///   - transaction timing is visible
 ///   - the admin address is visible
 ///
-/// OUT OF SCOPE for v1: this contract does not custody or transfer real tokens.
-/// It is the confidential *campaign metadata + claim* layer. Distribution rails
-/// (actual token movement) are handled off this contract via the TokenOps layer.
-/// `claim()` records confidential claim status; wiring it to a confidential
-/// ERC-7984 transfer is the documented mainnet roadmap item.
+/// CONFIDENTIAL PAYOUT: on `claim()`, the recipient's still-encrypted allocation
+/// is credited to their confidential balance in `CloakConfidentialToken` via an
+/// on-chain `FHE.add`. The payout amount is never revealed publicly — only the
+/// recipient can decrypt their resulting balance. The TokenOps layer tracks the
+/// distribution lifecycle alongside this confidential settlement.
 contract ConfidentialCampaign is ZamaEthereumConfig {
     enum CampaignType {
         PrivateRound,
@@ -214,8 +218,12 @@ contract ConfidentialCampaign is ZamaEthereumConfig {
     // Recipient: claim
     // ---------------------------------------------------------------------
 
-    /// @notice Recipient marks their confidential allocation as claimed.
-    /// @dev v1 records claim status only (no token custody). claimedCount is public.
+    /// @notice Recipient claims their confidential allocation.
+    /// @dev Records claim status (public claimedCount) and credits the
+    ///      recipient's confidential token balance with their still-encrypted
+    ///      allocation via `FHE.add` inside the token contract. The payout amount
+    ///      is never revealed publicly. If the campaign token is not a
+    ///      confidential token, the claim still records status (graceful no-op).
     function claim(uint256 campaignId) external campaignExists(campaignId) {
         EncryptedAllocation storage alloc = _allocations[campaignId][msg.sender];
         if (!alloc.eligible) revert NotEligible();
@@ -226,8 +234,20 @@ contract ConfidentialCampaign is ZamaEthereumConfig {
             revert ClaimWindowNotOpen();
         }
 
+        // Effects before interaction (claim cannot be replayed).
         alloc.claimed = true;
         c.claimedCount += 1;
+
+        // Confidential payout: grant the token transient access to the encrypted
+        // allocation, then credit the recipient's confidential balance on-chain.
+        if (c.token != address(0)) {
+            FHE.allowTransient(alloc.amount, c.token);
+            try ICloakConfidentialToken(c.token).creditConfidential(msg.sender, alloc.amount) {
+                // credited
+            } catch {
+                // Non-confidential token address: status-only claim.
+            }
+        }
 
         emit Claimed(campaignId, msg.sender);
     }

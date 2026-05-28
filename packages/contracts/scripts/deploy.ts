@@ -20,22 +20,17 @@ async function main() {
     `Balance:  ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} ETH\n`,
   );
 
-  const Token = await ethers.getContractFactory("MockConfidentialToken");
-  const token = await Token.deploy(
-    "CloakOps Demo Token",
-    "cDEMO",
-    18,
-    ethers.parseEther("10000000"),
-  );
+  const Token = await ethers.getContractFactory("CloakConfidentialToken");
+  const token = await Token.deploy("CloakOps Confidential Token", "cCLOAK");
   await token.waitForDeployment();
   const tokenAddress = await token.getAddress();
-  console.log(`MockConfidentialToken deployed: ${tokenAddress}`);
+  console.log(`CloakConfidentialToken deployed: ${tokenAddress}`);
 
   const Campaign = await ethers.getContractFactory("ConfidentialCampaign");
   const campaign = await Campaign.deploy();
   await campaign.waitForDeployment();
   const campaignAddress = await campaign.getAddress();
-  console.log(`ConfidentialCampaign deployed:  ${campaignAddress}`);
+  console.log(`ConfidentialCampaign deployed:   ${campaignAddress}`);
 
   const record = {
     network: network.name,
@@ -44,7 +39,7 @@ async function main() {
     deployer: deployer.address,
     contracts: {
       ConfidentialCampaign: campaignAddress,
-      MockConfidentialToken: tokenAddress,
+      CloakConfidentialToken: tokenAddress,
     },
   };
 
@@ -58,7 +53,9 @@ async function main() {
   console.log("\nDeployment saved to deployments/" + network.name + ".json");
   console.log("\nNext steps:");
   console.log(
-    `  1. Set in your frontend env:\n     NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS=${campaignAddress}`,
+    `  1. Set in your frontend env (apps/web/.env.local):\n` +
+      `     NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS=${campaignAddress}\n` +
+      `     NEXT_PUBLIC_CLOAKOPS_TOKEN_ADDRESS=${tokenAddress}`,
   );
   console.log("  2. Export the ABI to the web app:\n     npm run export-abi");
   console.log(

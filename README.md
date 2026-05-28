@@ -76,7 +76,7 @@ apps/web                 Next.js App Router frontend (TS + Tailwind + wagmi/viem
   lib/contracts          generated ABI + typed bindings + on-chain read/write helpers
   lib/wagmi              wallet/public client resolution for on-chain signing
 packages/contracts       Hardhat + @fhevm/solidity
-  contracts/             ConfidentialCampaign.sol, MockConfidentialToken.sol
+  contracts/             ConfidentialCampaign.sol, CloakConfidentialToken.sol
   test/                  FHEVM mock-mode tests
   scripts/               deploy.ts, create-demo-campaign.ts, export-abi.ts
 docs/                    architecture, privacy-model, tokenops-integration, video-script, x-thread
@@ -166,8 +166,8 @@ ZAMA_RELAYER_URL=https://relayer.testnet.zama.org/v2
 
 | Component | Address / link |
 | --- | --- |
-| CloakOps `ConfidentialCampaign` | `0xe14555024f730D31aDeD9759C0570399EE4eDc78` |
-| Mock token (cDEMO, ERC-20 reference) | `0x64b18e14F1A47C4152a69Ad12e50C6B9F0c6dd2E` |
+| CloakOps `ConfidentialCampaign` | `0x468d1Ab3bd52CbF43E4833A5696E47325De9C885` |
+| `CloakConfidentialToken` (cCLOAK, confidential payout asset) | `0x63E80Bb781638e604047bc98f405cA6d8058746c` |
 | TokenOps x ZAMA vesting contract | `0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494` |
 | TokenOps vesting tracking | [app.tokenops.xyz/contract/schedules/6a189b…](https://app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be) |
 
@@ -195,21 +195,25 @@ See [`.env.example`](.env.example) for all keys. No secrets are committed.
 - `addRecipient(...)` / `batchAddRecipients(...)` — store encrypted
   `euint64`/`euint8` values; grant decryption to contract (`FHE.allowThis`) and
   recipient (`FHE.allow`) only.
-- `claim(...)` — records confidential claim status; bumps the public claimed
-  count.
+- `claim(...)` — records confidential claim status, bumps the public claimed
+  count, and credits the recipient's confidential token balance in
+  `CloakConfidentialToken` with their still-encrypted allocation via an on-chain
+  `FHE.add`. The payout amount is never revealed publicly.
 - public getters for campaign state; encrypted getters return handles gated by
   the FHE ACL.
 
-`claim()` records claim status in v1 (no token custody); wiring it to a
-confidential ERC-7984 transfer via TokenOps is the documented roadmap item.
+`CloakConfidentialToken` (ERC-7984-style) stores `euint64` balances; only the
+account owner can decrypt their balance. This is the confidential settlement
+asset; the TokenOps layer tracks the surrounding distribution lifecycle.
 
 ---
 
 ## Limitations & roadmap
 
-- **MVP scope**: the contract is the confidential campaign + claim layer and
-  does not custody/transfer real tokens. Recipient addresses, tx timing, and the
-  admin address are visible (see privacy model).
+- **MVP scope**: claim credits a confidential `euint64` balance in
+  `CloakConfidentialToken` (a demo ERC-7984-style asset); it does not custody or
+  move pre-funded real tokens. Recipient addresses, tx timing, and the admin
+  address are visible (see privacy model).
 - **On-chain by default**: all encrypt/decrypt and writes run against the
   deployed contract + Zama relayer on Sepolia; a connected wallet on Sepolia is
   required.

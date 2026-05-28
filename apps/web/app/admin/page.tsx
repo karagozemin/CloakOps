@@ -19,9 +19,13 @@ import {
   type FlowStepStatus,
 } from "@/lib/campaigns/create-flow";
 import type { CampaignRecord } from "@/lib/campaigns/types";
-import { CAMPAIGN_TYPES, CHAIN_ID, CLOAKOPS_CONTRACT_ADDRESS } from "@/lib/config";
+import {
+  CAMPAIGN_TYPES,
+  CHAIN_ID,
+  CLOAKOPS_CONTRACT_ADDRESS,
+  CLOAKOPS_TOKEN_ADDRESS,
+} from "@/lib/config";
 import { resolveOnChainClients } from "@/lib/wagmi/on-chain-clients";
-import { DEPLOYED_TOKEN_ADDRESS } from "@/lib/contracts/deployed-address";
 import { SAMPLE_CAMPAIGN, SAMPLE_CSV } from "@/lib/sample/data";
 import { cn, formatNumber, shortAddress, toUnixSeconds } from "@/lib/utils";
 import {
@@ -57,7 +61,7 @@ export default function AdminPage() {
   const [name, setName] = useState("");
   const [campaignType, setCampaignType] = useState(0);
   const [totalBudget, setTotalBudget] = useState("");
-  const [tokenAddress, setTokenAddress] = useState("");
+  const [tokenAddress, setTokenAddress] = useState<string>(CLOAKOPS_TOKEN_ADDRESS);
   const [claimStart, setClaimStart] = useState(defaultLocalDateTime(0));
   const [claimEnd, setClaimEnd] = useState(defaultLocalDateTime(60));
   const [notes, setNotes] = useState("");
@@ -84,7 +88,7 @@ export default function AdminPage() {
     setName(SAMPLE_CAMPAIGN.name);
     setCampaignType(SAMPLE_CAMPAIGN.campaignType);
     setTotalBudget(SAMPLE_CAMPAIGN.totalBudget);
-    setTokenAddress(DEPLOYED_TOKEN_ADDRESS);
+    setTokenAddress(CLOAKOPS_TOKEN_ADDRESS);
     setNotes(SAMPLE_CAMPAIGN.notes);
     setClaimStart(defaultLocalDateTime(0));
     setClaimEnd(defaultLocalDateTime(SAMPLE_CAMPAIGN.claimWindowDays));

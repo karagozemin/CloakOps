@@ -4,14 +4,22 @@ import Link from "next/link";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
-import { useCampaigns } from "@/lib/campaigns/hooks";
+import { useAllCampaigns } from "@/lib/campaigns/onchain";
 import { campaignTypeLabel } from "@/lib/config";
 import { formatNumber } from "@/lib/utils";
 import { claimedCount } from "@/lib/campaigns/types";
-import { ArrowRight, FileSearch, Lock, ShieldCheck, Users } from "lucide-react";
+import {
+  ArrowRight,
+  FileSearch,
+  Loader2,
+  Lock,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 
 export default function PublicAuditIndexPage() {
-  const campaigns = useCampaigns();
+  const { campaigns, loading, error, refresh } = useAllCampaigns();
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -20,18 +28,29 @@ export default function PublicAuditIndexPage() {
         title="Confidential campaigns"
         description="Anyone can verify campaign rules and totals. Allocation amounts, tiers, and vesting stay encrypted with Zama FHE."
         action={
-          <Badge tone="gold">
-            <ShieldCheck className="h-3.5 w-3.5" /> Private allocations, public rules
-          </Badge>
+          <button className="btn-subtle" onClick={refresh} disabled={loading}>
+            <RefreshCw className={loading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+            Refresh
+          </button>
         }
       />
 
       <div className="mt-6">
-        {campaigns.length === 0 ? (
+        {loading && campaigns.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-cloak-line bg-ink-900/40 px-6 py-12 text-center">
+            <Loader2 className="mb-3 h-7 w-7 animate-spin text-gold" />
+            <p className="text-sm font-medium text-cloak-fg">
+              Reading campaigns from Sepolia…
+            </p>
+          </div>
+        ) : campaigns.length === 0 ? (
           <EmptyState
             icon={<FileSearch className="h-7 w-7" />}
             title="No campaigns yet"
-            description="Create a confidential campaign in the admin dashboard on Sepolia to see it here."
+            description={
+              error ??
+              "Create a confidential campaign in the admin dashboard on Sepolia to see it here."
+            }
             action={
               <Link href="/admin" className="btn-primary">
                 Create campaign

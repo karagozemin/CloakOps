@@ -14,6 +14,7 @@ import { campaignStore } from "@/lib/campaigns/store";
 import type { CampaignRecord, RecipientRecord } from "@/lib/campaigns/types";
 import {
   findRecipientAllocations,
+  readConfidentialBalance,
   readRecipientEligibility,
   readRecipientHandles,
 } from "@/lib/contracts/read";
@@ -117,11 +118,12 @@ export default function ClaimPage() {
     return Array.from(byId.values());
   }, [scanned, myAllocations]);
 
-  async function decryptField(
+  async function decryptAt(
     handle: string,
+    contractAddress: string,
     type: EncryptedFieldType,
   ): Promise<bigint> {
-    if (!address || !publicClient || !CLOAKOPS_CONTRACT_ADDRESS) {
+    if (!address || !publicClient) {
       throw new Error("Connect your wallet on Sepolia to decrypt.");
     }
     const clients = await resolveOnChainClients(address, publicClient);
@@ -130,12 +132,17 @@ export default function ClaimPage() {
       walletClient: clients.walletClient,
       account: clients.account,
     });
-    return provider.decryptValue(
-      handle,
-      CLOAKOPS_CONTRACT_ADDRESS,
-      address,
-      type,
-    );
+    return provider.decryptValue(handle, contractAddress, address, type);
+  }
+
+  function decryptField(
+    handle: string,
+    type: EncryptedFieldType,
+  ): Promise<bigint> {
+    if (!CLOAKOPS_CONTRACT_ADDRESS) {
+      throw new Error("Contract not configured.");
+    }
+    return decryptAt(handle, CLOAKOPS_CONTRACT_ADDRESS, type);
   }
 
   return (
@@ -207,6 +214,7 @@ export default function ClaimPage() {
                 address={address!}
                 publicClient={publicClient}
                 decrypt={(handle, type) => decryptField(handle, type)}
+                decryptAt={decryptAt}
               />
             ))
           )}
@@ -222,12 +230,18 @@ function AllocationCard({
   address,
   publicClient,
   decrypt,
+  decryptAt,
 }: {
   campaign: CampaignRecord;
   recipient: RecipientRecord;
   address: string;
   publicClient?: PublicClient;
   decrypt: (handle: string, type: EncryptedFieldType) => Promise<bigint>;
+  decryptAt: (
+    handle: string,
+    contractAddress: string,
+    type: EncryptedFieldType,
+  ) => Promise<bigint>;
 }) {
   const [claimed, setClaimed] = useState(recipient.claimed);
   const [claiming, setClaiming] = useState(false);
@@ -236,6 +250,25 @@ function AllocationCard({
     tier: recipient.tierHandle,
     vesting: recipient.vestingHandle,
   });
+  const [balanceHandle, setBalanceHandle] = useState<string | null>(null);
+  const tokenAddress = campaign.tokenAddress as `0x${string}` | "";
+
+  const loadBalance = useCallback(() => {
+    if (!publicClient || !tokenAddress) return;
+    readConfidentialBalance(
+      publicClient,
+      tokenAddress,
+      address as `0x${string}`,
+    )
+      .then((h) => {
+        if (h && /^0x0*$/.test(h) === false) setBalanceHandle(h);
+      })
+      .catch(() => {});
+  }, [publicClient, tokenAddress, address]);
+
+  useEffect(() => {
+    if (claimed) loadBalance();
+  }, [claimed, loadBalance]);
 
   useEffect(() => {
     if (!publicClient || !campaign.onChainId) return;
@@ -291,6 +324,8 @@ function AllocationCard({
       );
       campaignStore.markClaimed(campaign.id, address);
       setClaimed(true);
+      // Give the relayer a moment, then load the freshly credited balance.
+      setTimeout(loadBalance, 1500);
     } finally {
       setClaiming(false);
     }
@@ -341,6 +376,25 @@ function AllocationCard({
             format={(v) => VESTING_LABELS[Number(v)] ?? `Class ${v}`}
           />
         </div>
+
+        {claimed && balanceHandle && tokenAddress ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 rounded-lg border border-cloak-ok/20 bg-cloak-ok/5 p-3 text-xs text-cloak-muted">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-cloak-ok" />
+              Your allocation was credited to your confidential token balance via
+              an on-chain <span className="text-cloak-fg">FHE.add</span>. The payout
+              amount stays encrypted — only you can decrypt it.
+            </div>
+            <EncryptedField
+              label="Confidential token balance"
+              handle={balanceHandle}
+              canDecrypt={canDecrypt}
+              disabledReason="Only the recipient wallet can decrypt."
+              onDecrypt={() => decryptAt(balanceHandle, tokenAddress, "euint64")}
+              format={(v) => formatNumber(Number(v))}
+            />
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-cloak-line pt-4">
           <div className="flex items-center gap-2 text-xs text-cloak-muted">

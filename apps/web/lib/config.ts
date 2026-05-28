@@ -6,6 +6,10 @@ export const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME ?? "sepolia";
 export const CLOAKOPS_CONTRACT_ADDRESS = (process.env
   .NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS ?? "") as `0x${string}` | "";
 
+/** CloakConfidentialToken — the confidential payout asset credited on claim. */
+export const CLOAKOPS_TOKEN_ADDRESS = (process.env
+  .NEXT_PUBLIC_CLOAKOPS_TOKEN_ADDRESS ?? "") as `0x${string}` | "";
+
 /** Always real — Zama Relayer SDK on Sepolia. */
 export const ZAMA_MODE = "real" as const;
 
