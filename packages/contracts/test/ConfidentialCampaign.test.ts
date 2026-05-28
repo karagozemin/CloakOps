@@ -29,11 +29,14 @@ describe("ConfidentialCampaign", () => {
     [admin, alice, bob, mallory] = await ethers.getSigners();
 
     const Token = await ethers.getContractFactory("CloakConfidentialToken");
-    token = await Token.deploy("CloakOps Confidential Token", "cCLOAK");
+    token = (await Token.deploy(
+      "CloakOps Confidential Token",
+      "cCLOAK",
+    )) as unknown as CloakConfidentialToken;
     await token.waitForDeployment();
 
     const Campaign = await ethers.getContractFactory("ConfidentialCampaign");
-    campaign = await Campaign.deploy();
+    campaign = (await Campaign.deploy()) as unknown as ConfidentialCampaign;
     await campaign.waitForDeployment();
     contractAddress = await campaign.getAddress();
   });
