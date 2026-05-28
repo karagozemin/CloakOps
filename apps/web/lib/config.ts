@@ -1,15 +1,19 @@
 import { sepolia } from "viem/chains";
-import { getAddress, isAddress } from "viem";
+import { getAddress } from "viem";
 
 /**
  * Normalize an address env value: trim stray spaces/newlines (common when
- * pasting into Vercel) and re-checksum so viem never rejects it.
+ * pasting into Vercel) and re-checksum from lowercase so a wrong-case input
+ * never trips viem's EIP-55 checksum validation.
  */
 function envAddress(value: string | undefined): `0x${string}` | "" {
   const trimmed = (value ?? "").trim();
   if (!trimmed) return "";
-  if (isAddress(trimmed)) return getAddress(trimmed);
-  return trimmed as `0x${string}`;
+  try {
+    return getAddress(trimmed.toLowerCase());
+  } catch {
+    return trimmed as `0x${string}`;
+  }
 }
 
 export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 11155111);
@@ -91,7 +95,8 @@ export const TOKENOPS_VESTING_SCHEDULE_ID =
 
 export const TOKENOPS_VESTING_CONTRACT =
   envAddress(process.env.NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT) ||
-  ("0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494" as `0x${string}`);
+  envAddress("0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494") ||
+  ("" as `0x${string}`);
 
 /**
  * ERC-7984 token the configured vesting manager accepts.
