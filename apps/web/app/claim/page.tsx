@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { PublicClient } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
@@ -13,7 +13,7 @@ import { useCampaigns } from "@/lib/campaigns/hooks";
 import { campaignStore } from "@/lib/campaigns/store";
 import type { CampaignRecord, RecipientRecord } from "@/lib/campaigns/types";
 import {
-  readPublicCampaign,
+  findRecipientAllocations,
   readRecipientEligibility,
   readRecipientHandles,
 } from "@/lib/contracts/read";
@@ -24,7 +24,14 @@ import { TIER_LABELS, VESTING_LABELS } from "@/lib/sample/data";
 import { CLOAKOPS_CONTRACT_ADDRESS, campaignTypeLabel } from "@/lib/config";
 import { resolveOnChainClients } from "@/lib/wagmi/on-chain-clients";
 import { cn, formatNumber } from "@/lib/utils";
-import { CheckCircle2, Lock, Search, ShieldCheck, Wallet } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  Lock,
+  RefreshCw,
+  ShieldCheck,
+  Wallet,
+} from "lucide-react";
 
 export default function ClaimPage() {
   const { address, isConnected } = useAccount();
@@ -45,10 +52,70 @@ export default function ClaimPage() {
       );
   }, [campaigns, address]);
 
-  const knownIds = useMemo(
-    () => new Set(myAllocations.map(({ campaign }) => campaign.id)),
-    [myAllocations],
-  );
+  const [scanned, setScanned] = useState<
+    { campaign: CampaignRecord; recipient: RecipientRecord }[]
+  >([]);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  const scan = useCallback(async () => {
+    if (!address || !publicClient) return;
+    setScanning(true);
+    setScanError(null);
+    try {
+      const allocations = await findRecipientAllocations(
+        publicClient,
+        address as `0x${string}`,
+      );
+      setScanned(
+        allocations.map((a) => ({
+          campaign: {
+            id: String(a.campaignId),
+            onChainId: a.campaignId,
+            name: a.campaign.name,
+            campaignType: a.campaign.campaignType,
+            totalBudget: a.campaign.totalBudget.toString(),
+            tokenAddress: a.campaign.token,
+            admin: a.campaign.admin,
+            claimStart: Number(a.campaign.claimStart),
+            claimEnd: Number(a.campaign.claimEnd),
+            recipients: [],
+            createdAt: Date.now(),
+            source: "onchain",
+          } satisfies CampaignRecord,
+          recipient: {
+            wallet: address,
+            amountHandle: a.amountHandle,
+            tierHandle: a.tierHandle,
+            vestingHandle: a.vestingHandle,
+            role: "—",
+            claimed: a.claimed,
+          } satisfies RecipientRecord,
+        })),
+      );
+    } catch (e) {
+      setScanError(e instanceof Error ? e.message : "On-chain scan failed.");
+    } finally {
+      setScanning(false);
+    }
+  }, [address, publicClient]);
+
+  useEffect(() => {
+    void scan();
+  }, [scan]);
+
+  // Merge local + on-chain allocations, preferring the local record (it keeps
+  // the private role label). On-chain results cover wallets added in another
+  // browser where nothing was saved locally.
+  const allocations = useMemo(() => {
+    const byId = new Map<
+      string,
+      { campaign: CampaignRecord; recipient: RecipientRecord }
+    >();
+    for (const a of scanned) byId.set(a.campaign.id, a);
+    for (const a of myAllocations) byId.set(a.campaign.id, a);
+    return Array.from(byId.values());
+  }, [scanned, myAllocations]);
 
   async function decryptField(
     handle: string,
@@ -91,14 +158,48 @@ export default function ClaimPage() {
         </div>
       ) : (
         <div className="mt-8 space-y-6">
-          {myAllocations.length === 0 ? (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-cloak-muted">
+              {scanning
+                ? "Scanning Sepolia for campaigns where this wallet is a recipient…"
+                : `Found ${allocations.length} allocation${allocations.length === 1 ? "" : "s"} for ${address?.slice(0, 6)}…${address?.slice(-4)}`}
+            </p>
+            <button
+              className="btn-subtle"
+              onClick={() => void scan()}
+              disabled={scanning}
+            >
+              <RefreshCw
+                className={cn("h-3.5 w-3.5", scanning && "animate-spin")}
+              />
+              Refresh
+            </button>
+          </div>
+
+          {scanError ? (
+            <p className="text-xs text-cloak-danger">{scanError}</p>
+          ) : null}
+
+          {scanning && allocations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-cloak-line bg-ink-900/40 px-6 py-12 text-center">
+              <Loader2 className="mb-3 h-7 w-7 animate-spin text-gold" />
+              <p className="text-sm font-medium text-cloak-fg">
+                Checking your eligibility on-chain
+              </p>
+            </div>
+          ) : allocations.length === 0 ? (
             <EmptyState
               icon={<ShieldCheck className="h-7 w-7" />}
-              title="No saved allocation in this browser"
-              description="Allocations created in another browser aren't saved here. If your wallet was added as a recipient, look it up on-chain by campaign ID below."
+              title="No allocation found for this wallet"
+              description="This wallet isn't a recipient of any campaign on the contract. Ask the campaign admin to add your address, then refresh."
+              action={
+                <Link href="/public-audit" className="btn-subtle">
+                  View public campaigns
+                </Link>
+              }
             />
           ) : (
-            myAllocations.map(({ campaign, recipient }) => (
+            allocations.map(({ campaign, recipient }) => (
               <AllocationCard
                 key={`${campaign.id}-${recipient.wallet}`}
                 campaign={campaign}
@@ -109,152 +210,8 @@ export default function ClaimPage() {
               />
             ))
           )}
-
-          <OnChainLookup
-            address={address!}
-            publicClient={publicClient}
-            knownIds={knownIds}
-            decrypt={(handle, type) => decryptField(handle, type)}
-          />
         </div>
       )}
-    </div>
-  );
-}
-
-function OnChainLookup({
-  address,
-  publicClient,
-  knownIds,
-  decrypt,
-}: {
-  address: string;
-  publicClient?: PublicClient;
-  knownIds: Set<string>;
-  decrypt: (handle: string, type: EncryptedFieldType) => Promise<bigint>;
-}) {
-  const [idInput, setIdInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [found, setFound] = useState<{
-    campaign: CampaignRecord;
-    recipient: RecipientRecord;
-  } | null>(null);
-
-  async function lookup() {
-    setError(null);
-    setFound(null);
-    const id = idInput.trim();
-    if (!id || !/^\d+$/.test(id)) {
-      setError("Enter a numeric campaign ID (e.g. 1).");
-      return;
-    }
-    if (!publicClient) {
-      setError("No RPC client. Reconnect on Sepolia.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const campaignId = BigInt(id);
-      const campaign = await readPublicCampaign(publicClient, campaignId);
-      if (!campaign) {
-        setError(`No campaign #${id} exists on this contract.`);
-        return;
-      }
-      const eligibility = await readRecipientEligibility(
-        publicClient,
-        campaignId,
-        address as `0x${string}`,
-      );
-      if (!eligibility.eligible) {
-        setError(
-          `This wallet is not a recipient of campaign #${id}. Make sure the admin added ${address}.`,
-        );
-        return;
-      }
-      const handles = await readRecipientHandles(
-        publicClient,
-        campaignId,
-        address as `0x${string}`,
-      );
-      const record: CampaignRecord = {
-        id,
-        onChainId: Number(campaignId),
-        name: campaign.name,
-        campaignType: campaign.campaignType,
-        totalBudget: campaign.totalBudget.toString(),
-        tokenAddress: campaign.token,
-        admin: campaign.admin,
-        claimStart: Number(campaign.claimStart),
-        claimEnd: Number(campaign.claimEnd),
-        recipients: [],
-        createdAt: Date.now(),
-        source: "onchain",
-      };
-      const recipient: RecipientRecord = {
-        wallet: address,
-        amountHandle: handles.amountHandle,
-        tierHandle: handles.tierHandle,
-        vestingHandle: handles.vestingHandle,
-        role: "—",
-        claimed: eligibility.claimed,
-      };
-      setFound({ campaign: record, recipient });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Lookup failed.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader
-          icon={<Search className="h-4 w-4" />}
-          title="Look up your allocation on-chain"
-          subtitle="Enter the campaign ID to check eligibility directly from Sepolia"
-        />
-        <CardBody>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              className="input flex-1"
-              placeholder="Campaign ID (e.g. 1)"
-              inputMode="numeric"
-              value={idInput}
-              onChange={(e) => setIdInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && lookup()}
-            />
-            <button
-              className="btn-primary shrink-0"
-              onClick={lookup}
-              disabled={loading || !idInput.trim()}
-            >
-              {loading ? "Looking up…" : "Look up"}
-            </button>
-          </div>
-          {error ? (
-            <p className="mt-3 text-xs text-cloak-danger">{error}</p>
-          ) : null}
-          <p className="mt-3 text-xs text-cloak-faint">
-            Find the campaign ID on the{" "}
-            <Link href="/public-audit" className="text-gold hover:underline">
-              Public Audit
-            </Link>{" "}
-            page (shown as #ID).
-          </p>
-        </CardBody>
-      </Card>
-
-      {found && !knownIds.has(found.campaign.id) ? (
-        <AllocationCard
-          campaign={found.campaign}
-          recipient={found.recipient}
-          address={address}
-          publicClient={publicClient}
-          decrypt={decrypt}
-        />
-      ) : null}
     </div>
   );
 }
