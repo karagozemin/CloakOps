@@ -1,8 +1,10 @@
-import type { Address, PublicClient, WalletClient } from "viem";
+import type { Address } from "viem";
 import type { ParsedRecipient } from "@/lib/csv/parse";
 import type { ZamaProvider } from "@/lib/zama/types";
 import { ZAMA_MODE, tokenOpsVestingLink } from "@/lib/config";
 import { hasLiveContract } from "@/lib/contracts";
+import type { OnChainClients } from "@/lib/wagmi/on-chain-clients";
+export type { OnChainClients } from "@/lib/wagmi/on-chain-clients";
 import {
   batchAddRecipientsOnChain,
   createCampaignOnChain,
@@ -47,12 +49,6 @@ export interface TokenOpsBridge {
   createDistributionOperation: (
     input: CreateDistributionOperationInput,
   ) => Promise<DistributionOperationResult>;
-}
-
-export interface OnChainClients {
-  walletClient: WalletClient;
-  publicClient: PublicClient;
-  account: Address;
 }
 
 export interface RunCreateCampaignArgs {
@@ -185,6 +181,12 @@ export async function runCreateCampaign(
       throw err;
     }
   } else {
+    if (ZAMA_MODE === "real" && hasLiveContract) {
+      const msg =
+        "Real mode requires a Sepolia wallet signature for createCampaign and batchAddRecipients. Reconnect your wallet and try again.";
+      onStep("submit", "error", msg);
+      throw new Error(msg);
+    }
     const local = nextLocalId();
     id = local.id;
     onChainId = local.onChainId;
@@ -211,6 +213,7 @@ export async function runCreateCampaign(
       claimEnd: input.claimEnd,
       recipientCount: recipients.length,
       cloakOpsCampaignId: id,
+      onChain,
     });
     await tokenops.syncRecipients({
       tokenOpsCampaignId: tokenOpsResult.tokenOpsCampaignId,

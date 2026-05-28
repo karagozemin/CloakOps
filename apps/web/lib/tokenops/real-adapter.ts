@@ -107,20 +107,46 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
   async createCampaign(
     input: CreateTokenOpsCampaignInput,
   ): Promise<TokenOpsCampaignResult> {
+    const vesting = tokenOpsVestingLink();
+
+    // Vesting already deployed on app.tokenops.xyz — link CloakOps, don't redeploy.
+    if (vesting) {
+      this.log({
+        level: "success",
+        op: "createCampaign",
+        message: `Linked CloakOps campaign to TokenOps vesting schedule (${vesting.id}).`,
+        meta: {
+          url: vesting.url,
+          contract: vesting.contract,
+          cloakOpsCampaignId: input.cloakOpsCampaignId,
+        },
+      });
+      return {
+        tokenOpsCampaignId: vesting.id,
+        status: "created",
+        createdAt: Date.now(),
+        url: vesting.url,
+      };
+    }
+
     this.log({
       level: "info",
       op: "createCampaign",
       message: `Creating confidential airdrop "${input.name}" via @tokenops/sdk…`,
     });
 
-    if (!this.publicClient) {
+    const publicClient = input.onChain?.publicClient ?? this.publicClient;
+    const walletClient = input.onChain?.walletClient ?? this.walletClient;
+    const account = input.onChain?.account ?? this.account;
+
+    if (!publicClient) {
       throw new TokenOpsRealModeError(
         "Real mode needs a viem public client. Connect a wallet on Sepolia.",
       );
     }
-    if (!this.walletClient || !this.account) {
+    if (!walletClient || !account) {
       throw new TokenOpsRealModeError(
-        "Real mode needs a connected wallet to sign the createConfidentialAirdrop transaction.",
+        "Real mode needs a connected wallet to sign the createConfidentialAirdrop transaction. Set NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL to link an existing TokenOps vesting schedule instead.",
       );
     }
 
@@ -128,13 +154,13 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       await loadSdk();
 
     const encryptor = await createSepoliaEncryptorWeb({
-      publicClient: this.publicClient,
-      walletClient: this.walletClient,
+      publicClient,
+      walletClient,
     });
 
     const factory = createConfidentialAirdropFactoryClient({
-      publicClient: this.publicClient,
-      walletClient: this.walletClient,
+      publicClient,
+      walletClient,
       chainId: this.chainId,
       encryptor,
     });
@@ -149,7 +175,7 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
         admin: input.admin as Address,
       },
       userSalt,
-      account: this.account,
+      account,
     });
 
     const txHash = String(result.hash);
@@ -162,13 +188,11 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       meta: { txHash, airdrop },
     });
 
-    const vesting = tokenOpsVestingLink();
     return {
-      tokenOpsCampaignId: vesting?.id ?? airdrop,
+      tokenOpsCampaignId: airdrop,
       status: "pending",
       createdAt: Date.now(),
       txHash,
-      url: vesting?.url,
     };
   }
 

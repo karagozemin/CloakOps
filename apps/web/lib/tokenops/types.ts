@@ -40,6 +40,12 @@ export interface CreateTokenOpsCampaignInput {
   recipientCount: number;
   /** Reference to the on-chain CloakOps campaign once it exists. */
   cloakOpsCampaignId?: string;
+  /** Wallet clients from the create flow (wagmi `useWalletClient` can lag behind `isConnected`). */
+  onChain?: {
+    walletClient: import("viem").WalletClient;
+    publicClient: import("viem").PublicClient;
+    account: import("viem").Address;
+  };
 }
 
 export interface TokenOpsCampaignResult {

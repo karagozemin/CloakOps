@@ -8,6 +8,22 @@ import type {
   ZamaStatus,
 } from "./types";
 
+/** Absolute relayer URL for the FHE web worker (relative paths break Worker fetch). */
+function resolveRelayerUrl(custom?: string): string | undefined {
+  if (custom?.startsWith("http")) return custom;
+
+  const useProxy = process.env.NEXT_PUBLIC_ZAMA_USE_RELAYER_PROXY !== "false";
+  if (typeof window !== "undefined" && useProxy) {
+    const path = custom ?? `/api/relayer/${CHAIN_ID}`;
+    return `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`;
+  }
+
+  const direct =
+    process.env.NEXT_PUBLIC_ZAMA_RELAYER_URL ??
+    "https://relayer.testnet.zama.org/v2";
+  return direct.replace(/\/$/, "");
+}
+
 export interface RealZamaProviderOptions {
   publicClient?: PublicClient;
   walletClient?: WalletClient;
@@ -18,6 +34,7 @@ export interface RealZamaProviderOptions {
 
 /** Minimal structural type for the relayer methods this provider uses. */
 interface RelayerLike {
+  getPublicParams(bits: number): Promise<unknown>;
   encrypt(params: {
     contractAddress: Address;
     userAddress: Address;
@@ -51,6 +68,7 @@ export class RealZamaProvider implements ZamaProvider {
   readonly mode = "real" as const;
   private readonly opts: RealZamaProviderOptions;
   private relayer: RelayerLike | null = null;
+  private initPromise: Promise<RelayerLike> | null = null;
 
   constructor(opts: RealZamaProviderOptions) {
     this.opts = opts;
@@ -77,25 +95,61 @@ export class RealZamaProvider implements ZamaProvider {
     }
   }
 
-  private async ensureRelayer() {
+  private async ensureRelayer(): Promise<RelayerLike> {
     if (this.relayer) return this.relayer;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = this.initRelayer().finally(() => {
+      this.initPromise = null;
+    });
+    return this.initPromise;
+  }
+
+  private async initRelayer(): Promise<RelayerLike> {
     if (!this.opts.publicClient) {
       throw new Error("Missing viem public client (connect a wallet on Sepolia).");
     }
-    const { RelayerWeb, SepoliaConfig } = await import("@zama-fhe/sdk");
-    const relayerUrl =
-      this.opts.relayerUrl ?? `/api/relayer/${CHAIN_ID}`;
 
-    this.relayer = new RelayerWeb({
-      getChainId: async () => CHAIN_ID,
-      transports: {
-        [SepoliaConfig.chainId]: {
-          ...SepoliaConfig,
-          relayerUrl,
-        },
-      },
-    } as unknown as ConstructorParameters<typeof RelayerWeb>[0]) as unknown as RelayerLike;
-    return this.relayer;
+    const { RelayerWeb } = await import("@zama-fhe/sdk");
+
+    const transport: Record<string, string> = {};
+    const relayerUrl = resolveRelayerUrl(this.opts.relayerUrl);
+    if (relayerUrl) transport.relayerUrl = relayerUrl;
+
+    const rpcOverride = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL;
+    if (rpcOverride) transport.network = rpcOverride;
+
+    const relayerCandidates: Array<Record<string, string>> = [transport];
+    if (relayerUrl?.includes("/api/relayer/")) {
+      relayerCandidates.push({
+        relayerUrl: "https://relayer.testnet.zama.org/v2",
+        ...(rpcOverride ? { network: rpcOverride } : {}),
+      });
+    }
+
+    let lastError: unknown;
+    for (const chainTransport of relayerCandidates) {
+      try {
+        const instance = new RelayerWeb({
+          getChainId: () => Promise.resolve(CHAIN_ID),
+          transports: { [CHAIN_ID]: chainTransport },
+          security: {
+            integrityCheck: process.env.NODE_ENV === "production",
+          },
+        }) as unknown as RelayerLike;
+
+        await instance.getPublicParams(2048);
+        this.relayer = instance;
+        return instance;
+      } catch (err) {
+        lastError = err;
+        this.relayer = null;
+      }
+    }
+
+    const detail =
+      lastError instanceof Error ? lastError.message : String(lastError);
+    throw new Error(`Failed to initialize FHE worker: ${detail}`);
   }
 
   async encryptBatch(
@@ -105,7 +159,6 @@ export class RealZamaProvider implements ZamaProvider {
   ): Promise<BatchEncryptResult> {
     const relayer = await this.ensureRelayer();
 
-    // Single encrypt call → one shared inputProof for batchAddRecipients.
     const values: { value: bigint; type: string }[] = [];
     for (const r of recipients) {
       values.push(
@@ -115,11 +168,19 @@ export class RealZamaProvider implements ZamaProvider {
       );
     }
 
-    const result = await relayer.encrypt({
-      contractAddress: contractAddress as Address,
-      userAddress: userAddress as Address,
-      values,
-    });
+    let result;
+    try {
+      result = await relayer.encrypt({
+        contractAddress: contractAddress as Address,
+        userAddress: userAddress as Address,
+        values,
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Zama FHE encrypt failed: ${detail}. Try Chrome without extensions, hard refresh (Cmd+Shift+R), or temporarily set NEXT_PUBLIC_ZAMA_MODE=demo.`,
+      );
+    }
 
     const handles = result.handles;
     const encryptedRecipients = recipients.map((r, i) => ({

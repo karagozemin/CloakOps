@@ -14,8 +14,16 @@ async function forward(
     process.env.ZAMA_RELAYER_URL ?? "https://relayer.testnet.zama.org/v2"
   ).replace(/\/$/, "");
 
-  const subPath =
-    pathSegments && pathSegments.length ? `/${pathSegments.join("/")}` : "";
+  let segments = pathSegments ? [...pathSegments] : [];
+  // SDK may append /v1 or /v2 while ZAMA_RELAYER_URL already includes a version.
+  if (
+    segments.length > 0 &&
+    (upstream.endsWith("/v1") || upstream.endsWith("/v2")) &&
+    (segments[0] === "v1" || segments[0] === "v2")
+  ) {
+    segments = segments.slice(1);
+  }
+  const subPath = segments.length ? `/${segments.join("/")}` : "";
   const targetUrl = `${upstream}${subPath}${new URL(req.url).search}`;
 
   const headers = new Headers();

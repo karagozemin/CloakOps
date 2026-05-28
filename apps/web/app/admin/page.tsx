@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, useChainId, usePublicClient } from "wagmi";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
@@ -17,7 +17,8 @@ import {
   type FlowStepStatus,
 } from "@/lib/campaigns/create-flow";
 import type { CampaignRecord } from "@/lib/campaigns/types";
-import { CAMPAIGN_TYPES, CLOAKOPS_CONTRACT_ADDRESS, ZAMA_MODE } from "@/lib/config";
+import { CAMPAIGN_TYPES, CHAIN_ID, CLOAKOPS_CONTRACT_ADDRESS, ZAMA_MODE } from "@/lib/config";
+import { resolveOnChainClients } from "@/lib/wagmi/on-chain-clients";
 import { DEPLOYED_TOKEN_ADDRESS } from "@/lib/contracts/deployed-address";
 import { DEMO_CAMPAIGN, DEMO_CSV } from "@/lib/demo/data";
 import { cn, formatNumber, shortAddress, toUnixSeconds } from "@/lib/utils";
@@ -46,8 +47,8 @@ function defaultLocalDateTime(offsetDays = 0): string {
 
 export default function AdminPage() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
   const { provider: zama, status: zamaStatus, mode: zamaMode } = useZama();
   const tokenops = useTokenOps();
 
@@ -61,6 +62,7 @@ export default function AdminPage() {
   const [csvText, setCsvText] = useState("");
 
   const [statuses, setStatuses] = useState<Record<string, StepStatus>>({});
+  const [stepDetails, setStepDetails] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<CampaignRecord | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -105,6 +107,9 @@ export default function AdminPage() {
     if (ZAMA_MODE === "real" && !isConnected) {
       return "Connect your wallet on Sepolia for real mode (on-chain txs + FHE).";
     }
+    if (ZAMA_MODE === "real" && chainId !== CHAIN_ID) {
+      return `Switch your wallet to Sepolia (chain ${CHAIN_ID}) before creating.`;
+    }
     if (ZAMA_MODE === "real" && !CLOAKOPS_CONTRACT_ADDRESS) {
       return "NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS is not configured.";
     }
@@ -120,6 +125,7 @@ export default function AdminPage() {
       return;
     }
     setFormError(null);
+    setStepDetails({});
     setCreating(true);
     setCreated(null);
     setStatuses({ parse: "active" });
@@ -127,12 +133,20 @@ export default function AdminPage() {
     const onStep = (
       key: FlowStepKey,
       status: FlowStepStatus,
-      _detail?: string,
+      detail?: string,
     ) => {
       setStatuses((prev) => ({ ...prev, [key]: status }));
+      if (detail) {
+        setStepDetails((prev) => ({ ...prev, [key]: detail }));
+      }
     };
 
     try {
+      let onChain;
+      if (ZAMA_MODE === "real" && publicClient && address) {
+        onChain = await resolveOnChainClients(address, publicClient);
+      }
+
       const record = await runCreateCampaign({
         input: {
           name: name.trim(),
@@ -150,21 +164,11 @@ export default function AdminPage() {
         tokenops,
         contractAddress: CLOAKOPS_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000",
         onStep,
-        onChain:
-          ZAMA_MODE === "real" &&
-          walletClient &&
-          publicClient &&
-          address
-            ? {
-                walletClient,
-                publicClient,
-                account: address,
-              }
-            : undefined,
+        onChain,
       });
       setCreated(record);
-    } catch {
-      // step indicator already reflects the error
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : String(err));
     } finally {
       setCreating(false);
     }
@@ -332,6 +336,14 @@ export default function AdminPage() {
               </div>
 
               <StepIndicator steps={STEPS} statuses={statuses} />
+
+              {Object.entries(stepDetails).map(([key, detail]) =>
+                statuses[key] === "error" ? (
+                  <p key={key} className="text-xs text-cloak-danger">
+                    {detail}
+                  </p>
+                ) : null,
+              )}
 
               {formError ? (
                 <p className="text-xs text-cloak-danger">{formError}</p>
