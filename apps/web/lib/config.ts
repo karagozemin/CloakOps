@@ -1,14 +1,28 @@
 import { sepolia } from "viem/chains";
+import { getAddress, isAddress } from "viem";
+
+/**
+ * Normalize an address env value: trim stray spaces/newlines (common when
+ * pasting into Vercel) and re-checksum so viem never rejects it.
+ */
+function envAddress(value: string | undefined): `0x${string}` | "" {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "";
+  if (isAddress(trimmed)) return getAddress(trimmed);
+  return trimmed as `0x${string}`;
+}
 
 export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 11155111);
 export const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME ?? "sepolia";
 
-export const CLOAKOPS_CONTRACT_ADDRESS = (process.env
-  .NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS ?? "") as `0x${string}` | "";
+export const CLOAKOPS_CONTRACT_ADDRESS = envAddress(
+  process.env.NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS,
+);
 
 /** CloakConfidentialToken — the confidential payout asset credited on claim. */
-export const CLOAKOPS_TOKEN_ADDRESS = (process.env
-  .NEXT_PUBLIC_CLOAKOPS_TOKEN_ADDRESS ?? "") as `0x${string}` | "";
+export const CLOAKOPS_TOKEN_ADDRESS = envAddress(
+  process.env.NEXT_PUBLIC_CLOAKOPS_TOKEN_ADDRESS,
+);
 
 /** Always real — Zama Relayer SDK on Sepolia. */
 export const ZAMA_MODE = "real" as const;
@@ -75,16 +89,17 @@ export const TOKENOPS_VESTING_SCHEDULE_ID =
   process.env.NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_ID ??
   "6a189b396f763543bff332be";
 
-export const TOKENOPS_VESTING_CONTRACT = (process.env
-  .NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT ??
-  "0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494") as `0x${string}`;
+export const TOKENOPS_VESTING_CONTRACT =
+  envAddress(process.env.NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT) ||
+  ("0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494" as `0x${string}`);
 
 /**
  * ERC-7984 token the configured vesting manager accepts.
  * Must match the manager's immutable token (e.g. CTestToken on the linked schedule).
  */
-export const TOKENOPS_VESTING_TOKEN = (process.env
-  .NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN ?? "") as `0x${string}` | "";
+export const TOKENOPS_VESTING_TOKEN = envAddress(
+  process.env.NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN,
+);
 
 export const TOKENOPS_VESTING_SCHEDULE_URL =
   process.env.NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL ??
