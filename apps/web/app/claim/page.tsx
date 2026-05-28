@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { PublicClient, WalletClient } from "viem";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import type { PublicClient } from "viem";
+import { useAccount, usePublicClient } from "wagmi";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
@@ -12,12 +12,19 @@ import { ConnectButton } from "@/components/connect-button";
 import { useCampaigns } from "@/lib/campaigns/hooks";
 import { campaignStore } from "@/lib/campaigns/store";
 import type { CampaignRecord, RecipientRecord } from "@/lib/campaigns/types";
-import { DemoZamaProvider } from "@/lib/zama/demo-provider";
-import { useZama } from "@/lib/zama";
-import { TIER_LABELS, VESTING_LABELS } from "@/lib/demo/data";
-import { campaignTypeLabel, CLOAKOPS_CONTRACT_ADDRESS, ZAMA_MODE } from "@/lib/config";
+import { readRecipientEligibility, readRecipientHandles } from "@/lib/contracts/read";
 import { claimOnChain } from "@/lib/contracts/write";
-import { cn, formatNumber, shortAddress } from "@/lib/utils";
+import { DemoZamaProvider } from "@/lib/zama/demo-provider";
+import { RealZamaProvider } from "@/lib/zama/real-provider";
+import type { EncryptedFieldType } from "@/lib/zama/types";
+import { TIER_LABELS, VESTING_LABELS } from "@/lib/demo/data";
+import {
+  campaignTypeLabel,
+  CLOAKOPS_CONTRACT_ADDRESS,
+  ZAMA_MODE,
+} from "@/lib/config";
+import { resolveOnChainClients } from "@/lib/wagmi/on-chain-clients";
+import { cn, formatNumber } from "@/lib/utils";
 import {
   CheckCircle2,
   Lock,
@@ -26,16 +33,13 @@ import {
   Wallet,
 } from "lucide-react";
 
+const demoProvider = new DemoZamaProvider();
+
 export default function ClaimPage() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
   const campaigns = useCampaigns();
-  const { provider: zamaProvider, mode: zamaMode } = useZama();
   const [adding, setAdding] = useState(false);
-
-  const demoProvider = useMemo(() => new DemoZamaProvider(), []);
-  const decryptProvider = zamaMode === "real" ? zamaProvider : demoProvider;
 
   const myAllocations = useMemo(() => {
     if (!address) return [];
@@ -52,7 +56,7 @@ export default function ClaimPage() {
   }, [campaigns, address]);
 
   async function addMeToDemo() {
-    if (!address) return;
+    if (!address || ZAMA_MODE === "real") return;
     setAdding(true);
     try {
       const sample = {
@@ -75,6 +79,36 @@ export default function ClaimPage() {
     } finally {
       setAdding(false);
     }
+  }
+
+  async function decryptField(
+    campaign: CampaignRecord,
+    handle: string,
+    type: EncryptedFieldType,
+  ): Promise<bigint> {
+    if (!address) {
+      throw new Error("Connect your wallet to decrypt.");
+    }
+
+    if (campaign.source === "onchain") {
+      if (!publicClient || !CLOAKOPS_CONTRACT_ADDRESS) {
+        throw new Error("On-chain decrypt requires a connected Sepolia client.");
+      }
+      const clients = await resolveOnChainClients(address, publicClient);
+      const provider = new RealZamaProvider({
+        publicClient: clients.publicClient,
+        walletClient: clients.walletClient,
+        account: clients.account,
+      });
+      return provider.decryptValue(
+        handle,
+        CLOAKOPS_CONTRACT_ADDRESS,
+        address,
+        type,
+      );
+    }
+
+    return demoProvider.decryptValue(handle, campaign.tokenAddress, address, type);
   }
 
   return (
@@ -100,16 +134,26 @@ export default function ClaimPage() {
           <EmptyState
             icon={<ShieldCheck className="h-7 w-7" />}
             title="No allocation found for this wallet"
-            description="This address isn't a recipient in any local campaign yet. For the demo, add your connected wallet to the flagship campaign to experience the decrypt flow."
+            description={
+              ZAMA_MODE === "real"
+                ? "Your wallet must be listed in the admin CSV when the campaign is created on-chain. Ask the campaign admin to add your address, then create the campaign again from /admin."
+                : "This address isn't a recipient in any local campaign yet. For the demo, add your connected wallet to the flagship campaign to experience the decrypt flow."
+            }
             action={
-              <button
-                className="btn-primary"
-                onClick={addMeToDemo}
-                disabled={adding}
-              >
-                <UserPlus className="h-4 w-4" />
-                {adding ? "Encrypting…" : "Add my wallet to demo campaign"}
-              </button>
+              ZAMA_MODE === "real" ? (
+                <Link href="/admin" className="btn-primary">
+                  Go to admin
+                </Link>
+              ) : (
+                <button
+                  className="btn-primary"
+                  onClick={addMeToDemo}
+                  disabled={adding}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {adding ? "Encrypting…" : "Add my wallet to demo campaign"}
+                </button>
+              )
             }
           />
         </div>
@@ -117,20 +161,12 @@ export default function ClaimPage() {
         <div className="mt-8 space-y-6">
           {myAllocations.map(({ campaign, recipient }) => (
             <AllocationCard
-              key={campaign.id}
+              key={`${campaign.id}-${recipient.wallet}`}
               campaign={campaign}
               recipient={recipient}
               address={address!}
-              walletClient={walletClient}
               publicClient={publicClient}
-              decrypt={(handle, type) =>
-                decryptProvider.decryptValue(
-                  handle,
-                  CLOAKOPS_CONTRACT_ADDRESS || campaign.tokenAddress,
-                  address!,
-                  type,
-                )
-              }
+              decrypt={(handle, type) => decryptField(campaign, handle, type)}
             />
           ))}
         </div>
@@ -143,19 +179,77 @@ function AllocationCard({
   campaign,
   recipient,
   address,
-  walletClient,
   publicClient,
   decrypt,
 }: {
   campaign: CampaignRecord;
   recipient: RecipientRecord;
   address: string;
-  walletClient?: WalletClient;
   publicClient?: PublicClient;
-  decrypt: (handle: string, type: "euint64" | "euint8") => Promise<bigint>;
+  decrypt: (handle: string, type: EncryptedFieldType) => Promise<bigint>;
 }) {
   const [claimed, setClaimed] = useState(recipient.claimed);
   const [claiming, setClaiming] = useState(false);
+  const [handles, setHandles] = useState({
+    amount: recipient.amountHandle,
+    tier: recipient.tierHandle,
+    vesting: recipient.vestingHandle,
+  });
+
+  const isDemoRecipient =
+    campaign.source !== "onchain" ||
+    recipient.amountHandle.startsWith("0xa1") ||
+    recipient.amountHandle.startsWith("0xb2");
+
+  useEffect(() => {
+    if (
+      campaign.source !== "onchain" ||
+      !publicClient ||
+      !campaign.onChainId ||
+      isDemoRecipient
+    ) {
+      return;
+    }
+
+    let active = true;
+    readRecipientHandles(
+      publicClient,
+      BigInt(campaign.onChainId),
+      address as `0x${string}`,
+    )
+      .then((chainHandles) => {
+        if (!active) return;
+        setHandles({
+          amount: chainHandles.amountHandle,
+          tier: chainHandles.tierHandle,
+          vesting: chainHandles.vestingHandle,
+        });
+      })
+      .catch(() => {
+        /* keep local handles as fallback */
+      });
+
+    readRecipientEligibility(
+      publicClient,
+      BigInt(campaign.onChainId),
+      address as `0x${string}`,
+    )
+      .then((state) => {
+        if (active && state.claimed) setClaimed(true);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [
+    campaign.source,
+    campaign.onChainId,
+    publicClient,
+    address,
+    isDemoRecipient,
+    recipient.amountHandle,
+  ]);
 
   const now = Math.floor(Date.now() / 1000);
   const windowOpen = now >= campaign.claimStart && now <= campaign.claimEnd;
@@ -165,16 +259,18 @@ function AllocationCard({
     setClaiming(true);
     try {
       if (
-        ZAMA_MODE === "real" &&
         campaign.source === "onchain" &&
-        walletClient &&
         publicClient &&
         campaign.onChainId
       ) {
-        await claimOnChain(
-          walletClient,
-          publicClient,
+        const clients = await resolveOnChainClients(
           address as `0x${string}`,
+          publicClient,
+        );
+        await claimOnChain(
+          clients.walletClient,
+          clients.publicClient,
+          clients.account,
           BigInt(campaign.onChainId),
         );
       } else {
@@ -200,36 +296,61 @@ function AllocationCard({
         }
       />
       <CardBody className="space-y-5">
+        {isDemoRecipient && campaign.source === "onchain" ? (
+          <div className="rounded-lg border border-cloak-warn/30 bg-cloak-warn/10 p-3 text-xs text-cloak-warn">
+            This entry uses demo-only handles (added via “Add my wallet”). Real
+            decrypt requires your wallet in the admin CSV at campaign creation.
+            Create a new campaign from /admin with your address included.
+          </div>
+        ) : null}
+
         <div className="flex items-center gap-2 rounded-lg border border-gold/20 bg-gold/5 p-3 text-xs text-cloak-muted">
           <Lock className="h-3.5 w-3.5 shrink-0 text-gold" />
           Recipient addresses may be visible on-chain, but your allocation
           amount and tier metadata remain encrypted. Decrypt below — only your
           wallet can.
+          {campaign.source === "onchain" ? (
+            <span className="ml-1 text-gold">On-chain FHE handles.</span>
+          ) : (
+            <span className="ml-1">Demo mode handles.</span>
+          )}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
           <EncryptedField
             label="Allocation"
-            handle={recipient.amountHandle}
-            canDecrypt={canDecrypt}
-            disabledReason="Only the recipient wallet can decrypt."
-            onDecrypt={() => decrypt(recipient.amountHandle, "euint64")}
+            handle={handles.amount}
+            canDecrypt={canDecrypt && !isDemoRecipient}
+            disabledReason={
+              isDemoRecipient
+                ? "Demo handles are not valid on-chain. Re-create the campaign with your wallet in the CSV."
+                : "Only the recipient wallet can decrypt."
+            }
+            onDecrypt={() => decrypt(handles.amount, "euint64")}
             format={(v) => formatNumber(Number(v))}
           />
           <EncryptedField
             label="Tier"
-            handle={recipient.tierHandle}
-            canDecrypt={canDecrypt}
-            disabledReason="Only the recipient wallet can decrypt."
-            onDecrypt={() => decrypt(recipient.tierHandle, "euint8")}
+            handle={handles.tier}
+            canDecrypt={canDecrypt && !isDemoRecipient}
+            disabledReason={
+              isDemoRecipient
+                ? "Demo handles are not valid on-chain. Re-create the campaign with your wallet in the CSV."
+                : "Only the recipient wallet can decrypt."
+            }
+            onDecrypt={() => decrypt(handles.tier, "euint8")}
             format={(v) => TIER_LABELS[Number(v)] ?? `Tier ${v}`}
           />
           <EncryptedField
             label="Vesting class"
-            handle={recipient.vestingHandle}
-            canDecrypt={canDecrypt}
-            disabledReason="Only the recipient wallet can decrypt."
-            onDecrypt={() => decrypt(recipient.vestingHandle, "euint8")}
+            handle={handles.vesting}
+            canDecrypt={canDecrypt && !isDemoRecipient}
+            disabledReason={
+              isDemoRecipient
+                ? "Demo handles are not valid on-chain. Re-create the campaign with your wallet in the CSV."
+                : "Only the recipient wallet can decrypt."
+            }
+            onDecrypt={() => decrypt(handles.vesting, "euint8")}
             format={(v) => VESTING_LABELS[Number(v)] ?? `Class ${v}`}
           />
         </div>
@@ -247,10 +368,20 @@ function AllocationCard({
             <button
               className={cn("btn-primary", !windowOpen && "opacity-50")}
               onClick={handleClaim}
-              disabled={claiming || !windowOpen}
-              title={!windowOpen ? "Claim window is not open." : undefined}
+              disabled={claiming || !windowOpen || isDemoRecipient}
+              title={
+                isDemoRecipient
+                  ? "Re-create the campaign with your wallet in the admin CSV."
+                  : !windowOpen
+                    ? "Claim window is not open."
+                    : undefined
+              }
             >
-              {claiming ? "Claiming…" : windowOpen ? "Claim allocation" : "Claim window closed"}
+              {claiming
+                ? "Claiming…"
+                : windowOpen
+                  ? "Claim allocation"
+                  : "Claim window closed"}
             </button>
           )}
         </div>

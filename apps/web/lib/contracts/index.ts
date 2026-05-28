@@ -19,3 +19,4 @@ export {
   claimOnChain,
   createCampaignOnChain,
 } from "./write";
+export { readRecipientEligibility, readRecipientHandles } from "./read";
