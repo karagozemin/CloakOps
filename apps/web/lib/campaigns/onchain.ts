@@ -87,8 +87,26 @@ export function useAllCampaigns(): {
 
   const campaigns = useMemo(() => {
     const byId = new Map<string, CampaignRecord>();
+    // On-chain list is the source of truth for which campaigns exist.
     for (const c of chain) byId.set(c.id, c);
-    for (const c of local) byId.set(c.id, c); // local overrides (notes, roles)
+    // Local storage only enriches campaigns that still exist on the contract
+    // (notes, role labels). Stale entries from a previous deploy are ignored.
+    for (const c of local) {
+      const onChain = byId.get(c.id);
+      if (!onChain) continue;
+      byId.set(c.id, {
+        ...onChain,
+        ...c,
+        id: onChain.id,
+        onChainId: onChain.onChainId,
+        // Keep local role labels when present; fall back to chain ledger.
+        recipients:
+          c.recipients.length > 0 &&
+          !c.recipients[0]?.wallet.startsWith("placeholder-")
+            ? c.recipients
+            : onChain.recipients,
+      });
+    }
     return Array.from(byId.values()).sort(
       (a, b) => (b.onChainId ?? 0) - (a.onChainId ?? 0),
     );
@@ -97,8 +115,7 @@ export function useAllCampaigns(): {
   return { campaigns, loading, error, refresh: load };
 }
 
-/** Single campaign: prefers the rich local record, falls back to on-chain
- *  (public metadata + recipient ledger from events). */
+/** Single campaign: on-chain is source of truth; local enriches notes/roles. */
 export function useCampaignOrChain(id: string): {
   campaign: CampaignRecord | undefined;
   loading: boolean;
@@ -111,10 +128,10 @@ export function useCampaignOrChain(id: string): {
   );
 
   const [chain, setChain] = useState<CampaignRecord | undefined>(undefined);
-  const [loading, setLoading] = useState(!localMatch);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (localMatch || !publicClient || !/^\d+$/.test(id)) {
+    if (!publicClient || !/^\d+$/.test(id)) {
       setLoading(false);
       return;
     }
@@ -151,7 +168,24 @@ export function useCampaignOrChain(id: string): {
     return () => {
       active = false;
     };
-  }, [id, localMatch, publicClient]);
+  }, [id, publicClient]);
 
-  return { campaign: localMatch ?? chain, loading };
+  const campaign = useMemo(() => {
+    if (!chain) return undefined;
+    if (!localMatch || localMatch.id !== chain.id) return chain;
+    return {
+      ...chain,
+      notes: localMatch.notes ?? chain.notes,
+      tokenOpsCampaignId: localMatch.tokenOpsCampaignId ?? chain.tokenOpsCampaignId,
+      tokenOpsUrl: localMatch.tokenOpsUrl ?? chain.tokenOpsUrl,
+      txHash: localMatch.txHash ?? chain.txHash,
+      recipients:
+        localMatch.recipients.length > 0 &&
+        !localMatch.recipients[0]?.wallet.startsWith("placeholder-")
+          ? localMatch.recipients
+          : chain.recipients,
+    };
+  }, [chain, localMatch]);
+
+  return { campaign, loading };
 }

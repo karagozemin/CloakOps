@@ -114,7 +114,14 @@ export default function ClaimPage() {
       { campaign: CampaignRecord; recipient: RecipientRecord }
     >();
     for (const a of scanned) byId.set(a.campaign.id, a);
-    for (const a of myAllocations) byId.set(a.campaign.id, a);
+    for (const a of myAllocations) {
+      const onChain = byId.get(a.campaign.id);
+      if (!onChain) continue;
+      byId.set(a.campaign.id, {
+        campaign: { ...onChain.campaign, ...a.campaign, id: onChain.campaign.id },
+        recipient: { ...onChain.recipient, role: a.recipient.role },
+      });
+    }
     return Array.from(byId.values());
   }, [scanned, myAllocations]);
 
