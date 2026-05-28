@@ -67,7 +67,7 @@ export function PublicSummary({ campaign }: { campaign: CampaignRecord }) {
 
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={campaign.source === "onchain" ? "ok" : "neutral"} dot>
-          {campaign.source === "onchain" ? "On-chain" : "Demo campaign"}
+          On-chain · Sepolia
         </Badge>
         {campaign.tokenOpsCampaignId ? (
           <Badge tone="gold">

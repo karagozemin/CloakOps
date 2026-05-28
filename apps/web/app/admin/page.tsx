@@ -17,10 +17,10 @@ import {
   type FlowStepStatus,
 } from "@/lib/campaigns/create-flow";
 import type { CampaignRecord } from "@/lib/campaigns/types";
-import { CAMPAIGN_TYPES, CHAIN_ID, CLOAKOPS_CONTRACT_ADDRESS, ZAMA_MODE } from "@/lib/config";
+import { CAMPAIGN_TYPES, CHAIN_ID, CLOAKOPS_CONTRACT_ADDRESS } from "@/lib/config";
 import { resolveOnChainClients } from "@/lib/wagmi/on-chain-clients";
 import { DEPLOYED_TOKEN_ADDRESS } from "@/lib/contracts/deployed-address";
-import { DEMO_CAMPAIGN, DEMO_CSV } from "@/lib/demo/data";
+import { SAMPLE_CAMPAIGN, SAMPLE_CSV } from "@/lib/sample/data";
 import { cn, formatNumber, shortAddress, toUnixSeconds } from "@/lib/utils";
 import {
   ArrowRight,
@@ -49,7 +49,7 @@ export default function AdminPage() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const publicClient = usePublicClient();
-  const { provider: zama, status: zamaStatus, mode: zamaMode } = useZama();
+  const { provider: zama, status: zamaStatus } = useZama();
   const tokenops = useTokenOps();
 
   const [name, setName] = useState("");
@@ -77,15 +77,15 @@ export default function AdminPage() {
   const overBudget =
     parseResult && budgetNum > 0 && parseResult.totalAllocation > budgetNum;
 
-  function loadDemo() {
-    setName(DEMO_CAMPAIGN.name);
-    setCampaignType(DEMO_CAMPAIGN.campaignType);
-    setTotalBudget(DEMO_CAMPAIGN.totalBudget);
+  function loadSampleCsv() {
+    setName(SAMPLE_CAMPAIGN.name);
+    setCampaignType(SAMPLE_CAMPAIGN.campaignType);
+    setTotalBudget(SAMPLE_CAMPAIGN.totalBudget);
     setTokenAddress(DEPLOYED_TOKEN_ADDRESS);
-    setNotes(DEMO_CAMPAIGN.notes);
+    setNotes(SAMPLE_CAMPAIGN.notes);
     setClaimStart(defaultLocalDateTime(0));
-    setClaimEnd(defaultLocalDateTime(DEMO_CAMPAIGN.claimWindowDays));
-    setCsvText(DEMO_CSV);
+    setClaimEnd(defaultLocalDateTime(SAMPLE_CAMPAIGN.claimWindowDays));
+    setCsvText(SAMPLE_CSV);
     setCreated(null);
     setStatuses({});
   }
@@ -104,13 +104,13 @@ export default function AdminPage() {
       return "Add at least one recipient via CSV.";
     if (parseResult.errors.length > 0)
       return "Fix the CSV validation errors first.";
-    if (ZAMA_MODE === "real" && !isConnected) {
-      return "Connect your wallet on Sepolia for real mode (on-chain txs + FHE).";
+    if (!isConnected) {
+      return "Connect your wallet on Sepolia (on-chain txs + FHE).";
     }
-    if (ZAMA_MODE === "real" && chainId !== CHAIN_ID) {
+    if (chainId !== CHAIN_ID) {
       return `Switch your wallet to Sepolia (chain ${CHAIN_ID}) before creating.`;
     }
-    if (ZAMA_MODE === "real" && !CLOAKOPS_CONTRACT_ADDRESS) {
+    if (!CLOAKOPS_CONTRACT_ADDRESS) {
       return "NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS is not configured.";
     }
     if (toUnixSeconds(claimEnd) <= toUnixSeconds(claimStart))
@@ -142,10 +142,10 @@ export default function AdminPage() {
     };
 
     try {
-      let onChain;
-      if (ZAMA_MODE === "real" && publicClient && address) {
-        onChain = await resolveOnChainClients(address, publicClient);
+      if (!publicClient || !address) {
+        throw new Error("Connect your wallet on Sepolia.");
       }
+      const onChain = await resolveOnChainClients(address, publicClient);
 
       const record = await runCreateCampaign({
         input: {
@@ -154,7 +154,7 @@ export default function AdminPage() {
           campaignType,
           totalBudget: String(budgetNum),
           tokenAddress: tokenAddress.trim(),
-          admin: address ?? "0xC10a40000000000000000000000000000000a0ps",
+          admin: address,
           claimStart: toUnixSeconds(claimStart),
           claimEnd: toUnixSeconds(claimEnd),
           notes: notes.trim() || undefined,
@@ -162,7 +162,7 @@ export default function AdminPage() {
         recipients: parseResult!.recipients,
         zama,
         tokenops,
-        contractAddress: CLOAKOPS_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000",
+        contractAddress: CLOAKOPS_CONTRACT_ADDRESS,
         onStep,
         onChain,
       });
@@ -181,9 +181,9 @@ export default function AdminPage() {
         title="Create a confidential campaign"
         description="Upload allocations, encrypt them with Zama FHE, and sync the campaign lifecycle to TokenOps. Allocation amounts, tiers, and vesting stay private; budget and rules stay public."
         action={
-          <button className="btn-ghost" onClick={loadDemo}>
+          <button className="btn-ghost" onClick={loadSampleCsv}>
             <Sparkles className="h-4 w-4" />
-            Load Demo CSV
+            Load sample CSV
           </button>
         }
       />
@@ -316,7 +316,7 @@ export default function AdminPage() {
                 <EmptyState
                   icon={<EyeOff className="h-6 w-6" />}
                   title="No recipients yet"
-                  description="Paste a CSV or click Load Demo CSV to preview parsed allocations."
+                  description="Paste a CSV or click Load sample CSV to preview parsed allocations."
                 />
               )}
             </CardBody>
@@ -388,9 +388,7 @@ export default function AdminPage() {
             <CardBody className="space-y-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-cloak-muted">Mode</span>
-                <Badge tone={zamaMode === "real" ? "gold" : "neutral"}>
-                  {zamaMode === "real" ? "Relayer SDK" : "Demo encryption"}
-                </Badge>
+                <Badge tone="gold">Relayer SDK</Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-cloak-muted">Contract</span>

@@ -9,7 +9,7 @@
  * addresses + counts).
  */
 
-export type TokenOpsMode = "real" | "demo";
+export type TokenOpsMode = "real";
 
 export interface TokenOpsStatus {
   mode: TokenOpsMode;
@@ -112,7 +112,7 @@ export interface TokenOpsAdapterOptions {
   onLog?: TokenOpsLogger;
 }
 
-/** The contract every TokenOps adapter (real or demo) must implement. */
+/** The contract every TokenOps adapter must implement. */
 export interface TokenOpsCampaignAdapter {
   readonly mode: TokenOpsMode;
   getStatus(): Promise<TokenOpsStatus>;

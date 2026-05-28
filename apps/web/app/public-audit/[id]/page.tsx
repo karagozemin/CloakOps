@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
 import { PublicSummary } from "@/components/campaign/public-summary";
-import { useCampaign, useSeedReady } from "@/lib/campaigns/hooks";
+import { useCampaign } from "@/lib/campaigns/hooks";
 import { explorerAddress, hasLiveContractAddressNote } from "@/lib/config";
 import { shortAddress } from "@/lib/utils";
 import { CLOAKOPS_CONTRACT_ADDRESS } from "@/lib/config";
@@ -38,16 +38,6 @@ export default function PublicAuditPage() {
   const params = useParams();
   const id = String(params.id);
   const campaign = useCampaign(id);
-  const ready = useSeedReady();
-
-  if (!campaign && !ready) {
-    return (
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <PageHeader eyebrow="Public audit" title="Loading campaign…" />
-        <div className="mt-8 h-40 animate-pulse rounded-xl border border-cloak-line bg-ink-850/60" />
-      </div>
-    );
-  }
 
   if (!campaign) {
     return (
@@ -57,10 +47,10 @@ export default function PublicAuditPage() {
           <EmptyState
             icon={<FileSearch className="h-7 w-7" />}
             title={`No campaign with id "${id}"`}
-            description="Create a campaign in the admin dashboard, or open the flagship demo campaign."
+            description="Create a campaign in the admin dashboard on Sepolia."
             action={
-              <Link href="/public-audit/1" className="btn-ghost">
-                Open demo campaign
+              <Link href="/admin" className="btn-primary">
+                Create campaign
               </Link>
             }
           />

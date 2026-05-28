@@ -46,9 +46,7 @@ export function TokenOpsPanel({ className }: { className?: string }) {
       <CardBody className="space-y-4">
         <div className="grid grid-cols-2 gap-3 text-sm">
           <Field label="Mode">
-            <Badge tone={mode === "real" ? "gold" : "neutral"}>
-              {mode === "real" ? "Real SDK" : "Demo adapter"}
-            </Badge>
+            <Badge tone="gold">Real SDK</Badge>
           </Field>
           <Field label="Connection">
             <Badge tone={connected ? "ok" : statusLoading ? "neutral" : "warn"} dot>

@@ -44,14 +44,14 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link href="/admin" className="btn-primary">
-              Launch Admin Demo
+              Launch Admin
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link href="/claim" className="btn-ghost">
-              Open Claim Demo
+              Open Claim
             </Link>
-            <Link href="/public-audit/1" className="btn-subtle">
-              View Public Audit
+            <Link href="/admin" className="btn-subtle">
+              Create campaign
             </Link>
           </div>
         </div>

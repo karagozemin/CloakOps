@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
 import { PublicSummary } from "@/components/campaign/public-summary";
 import { TokenOpsPanel } from "@/components/tokenops/tokenops-panel";
-import { useCampaign, useSeedReady } from "@/lib/campaigns/hooks";
+import { useCampaign } from "@/lib/campaigns/hooks";
 import { findRecipient } from "@/lib/campaigns/store";
 import { campaignTypeLabel, explorerAddress, CLOAKOPS_CONTRACT_ADDRESS } from "@/lib/config";
 import { formatDateTime, shortAddress } from "@/lib/utils";
@@ -26,16 +26,6 @@ export default function CampaignDetailPage() {
   const id = String(params.id);
   const campaign = useCampaign(id);
   const { address } = useAccount();
-  const ready = useSeedReady();
-
-  if (!campaign && !ready) {
-    return (
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <PageHeader eyebrow="Campaign" title="Loading campaign…" />
-        <div className="mt-8 h-40 animate-pulse rounded-xl border border-cloak-line bg-ink-850/60" />
-      </div>
-    );
-  }
 
   if (!campaign) {
     return (
@@ -45,7 +35,7 @@ export default function CampaignDetailPage() {
           <EmptyState
             icon={<FileSearch className="h-7 w-7" />}
             title={`No campaign with id "${id}"`}
-            description="It may have been created in another browser (demo campaigns are stored locally)."
+            description="Create a campaign from /admin on Sepolia. Campaign metadata is stored in this browser after creation."
             action={
               <Link href="/admin" className="btn-ghost">
                 Go to admin
@@ -157,13 +147,11 @@ export default function CampaignDetailPage() {
                     {shortAddress(CLOAKOPS_CONTRACT_ADDRESS, 6)}
                   </a>
                 ) : (
-                  <span className="text-cloak-muted">demo (no live contract)</span>
+                  <span className="text-cloak-muted">not configured</span>
                 )}
               </Row>
               <Row label="Source">
-                <Badge tone={campaign.source === "onchain" ? "ok" : "neutral"}>
-                  {campaign.source === "onchain" ? "On-chain" : "Demo"}
-                </Badge>
+                <Badge tone="ok">On-chain · Sepolia</Badge>
               </Row>
             </CardBody>
           </Card>

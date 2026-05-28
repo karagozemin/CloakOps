@@ -2,23 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import { ZAMA_MODE } from "@/lib/config";
-import { DemoZamaProvider } from "./demo-provider";
 import { RealZamaProvider, type RealZamaProviderOptions } from "./real-provider";
-import type { ZamaMode, ZamaProvider, ZamaStatus } from "./types";
+import type { ZamaProvider, ZamaStatus } from "./types";
 
-export function createZamaProvider(
-  mode: ZamaMode,
-  opts: RealZamaProviderOptions,
-): ZamaProvider {
-  if (mode === "real") {
-    return new RealZamaProvider(opts);
-  }
-  return new DemoZamaProvider();
+export function createZamaProvider(opts: RealZamaProviderOptions): ZamaProvider {
+  return new RealZamaProvider(opts);
 }
 
 export function useZama() {
-  const mode = ZAMA_MODE;
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const { address } = useAccount();
@@ -26,12 +17,12 @@ export function useZama() {
 
   const provider = useMemo(
     () =>
-      createZamaProvider(mode, {
+      createZamaProvider({
         publicClient,
         walletClient,
         account: address,
       }),
-    [mode, publicClient, walletClient, address],
+    [publicClient, walletClient, address],
   );
 
   useEffect(() => {
@@ -39,15 +30,22 @@ export function useZama() {
     provider
       .getStatus()
       .then((s) => active && setStatus(s))
-      .catch(() => active && setStatus({ mode, ready: false, message: "Zama provider error." }));
+      .catch(
+        () =>
+          active &&
+          setStatus({
+            mode: "real",
+            ready: false,
+            message: "Zama provider error.",
+          }),
+      );
     return () => {
       active = false;
     };
-  }, [provider, mode]);
+  }, [provider]);
 
-  return { provider, status, mode };
+  return { provider, status, mode: "real" as const };
 }
 
 export * from "./types";
-export { DemoZamaProvider } from "./demo-provider";
 export { RealZamaProvider } from "./real-provider";

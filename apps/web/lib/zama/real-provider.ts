@@ -178,7 +178,7 @@ export class RealZamaProvider implements ZamaProvider {
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       throw new Error(
-        `Zama FHE encrypt failed: ${detail}. Try Chrome without extensions, hard refresh (Cmd+Shift+R), or temporarily set NEXT_PUBLIC_ZAMA_MODE=demo.`,
+        `Zama FHE encrypt failed: ${detail}. Try Chrome without extensions or hard refresh (Cmd+Shift+R).`,
       );
     }
 

@@ -27,8 +27,8 @@ export interface CampaignRecord {
   tokenOpsCampaignId?: string;
   tokenOpsUrl?: string;
   notes?: string;
-  /** "demo" = local simulation; "onchain" = backed by a deployed contract. */
-  source: "demo" | "onchain";
+  /** Always backed by ConfidentialCampaign.sol on Sepolia. */
+  source: "onchain";
 }
 
 export function claimedCount(c: CampaignRecord): number {

@@ -1,20 +1,14 @@
-import { DemoTokenOpsAdapter } from "./demo-adapter";
 import {
   RealTokenOpsAdapter,
   type RealTokenOpsAdapterOptions,
 } from "./real-adapter";
-import type { TokenOpsCampaignAdapter, TokenOpsMode } from "./types";
+import type { TokenOpsCampaignAdapter } from "./types";
 
 export function createTokenOpsAdapter(
-  mode: TokenOpsMode,
   opts: RealTokenOpsAdapterOptions,
 ): TokenOpsCampaignAdapter {
-  if (mode === "real") {
-    return new RealTokenOpsAdapter(opts);
-  }
-  return new DemoTokenOpsAdapter(opts);
+  return new RealTokenOpsAdapter(opts);
 }
 
 export * from "./types";
-export { DemoTokenOpsAdapter } from "./demo-adapter";
 export { RealTokenOpsAdapter, TokenOpsRealModeError } from "./real-adapter";

@@ -6,13 +6,11 @@ export const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME ?? "sepolia";
 export const CLOAKOPS_CONTRACT_ADDRESS = (process.env
   .NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS ?? "") as `0x${string}` | "";
 
-export const TOKENOPS_MODE = (process.env.NEXT_PUBLIC_TOKENOPS_MODE ?? "demo") as
-  | "demo"
-  | "real";
+/** Always real — Zama Relayer SDK on Sepolia. */
+export const ZAMA_MODE = "real" as const;
 
-export const ZAMA_MODE = (process.env.NEXT_PUBLIC_ZAMA_MODE ?? "demo") as
-  | "demo"
-  | "real";
+/** Always real — @tokenops/sdk + live vesting link. */
+export const TOKENOPS_MODE = "real" as const;
 
 export const WALLETCONNECT_PROJECT_ID =
   process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";

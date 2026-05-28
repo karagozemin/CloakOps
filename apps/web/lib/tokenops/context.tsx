@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import { CHAIN_ID, TOKENOPS_MODE } from "@/lib/config";
+import { CHAIN_ID } from "@/lib/config";
 import { createTokenOpsAdapter } from "./index";
 import type {
   CreateDistributionOperationInput,
@@ -22,12 +22,11 @@ import type {
   TokenOpsCampaignResult,
   TokenOpsLogEntry,
   TokenOpsLogger,
-  TokenOpsMode,
   TokenOpsStatus,
 } from "./types";
 
 interface TokenOpsContextValue {
-  mode: TokenOpsMode;
+  mode: "real";
   status: TokenOpsStatus | null;
   statusLoading: boolean;
   log: TokenOpsLogEntry[];
@@ -47,7 +46,7 @@ const TokenOpsContext = createContext<TokenOpsContextValue | null>(null);
 let logSeq = 0;
 
 export function TokenOpsProvider({ children }: { children: ReactNode }) {
-  const mode = TOKENOPS_MODE;
+  const mode = "real" as const;
   const [status, setStatus] = useState<TokenOpsStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [log, setLog] = useState<TokenOpsLogEntry[]>([]);
@@ -71,17 +70,17 @@ export function TokenOpsProvider({ children }: { children: ReactNode }) {
 
   // Recreate the adapter when wallet/clients change.
   const adapterRef = useRef(
-    createTokenOpsAdapter(mode, { chainId: CHAIN_ID, onLog: pushLog }),
+    createTokenOpsAdapter({ chainId: CHAIN_ID, onLog: pushLog }),
   );
   useEffect(() => {
-    adapterRef.current = createTokenOpsAdapter(mode, {
+    adapterRef.current = createTokenOpsAdapter({
       chainId: CHAIN_ID,
       onLog: pushLog,
       publicClient: publicClient as never,
       walletClient: walletClient as never,
       account: address,
     });
-  }, [mode, pushLog, publicClient, walletClient, address]);
+  }, [pushLog, publicClient, walletClient, address]);
 
   const refreshStatus = useCallback(async () => {
     setStatusLoading(true);
