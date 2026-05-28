@@ -12,7 +12,11 @@ import { ConnectButton } from "@/components/connect-button";
 import { useCampaigns } from "@/lib/campaigns/hooks";
 import { campaignStore } from "@/lib/campaigns/store";
 import type { CampaignRecord, RecipientRecord } from "@/lib/campaigns/types";
-import { readRecipientEligibility, readRecipientHandles } from "@/lib/contracts/read";
+import {
+  readPublicCampaign,
+  readRecipientEligibility,
+  readRecipientHandles,
+} from "@/lib/contracts/read";
 import { claimOnChain } from "@/lib/contracts/write";
 import { RealZamaProvider } from "@/lib/zama/real-provider";
 import type { EncryptedFieldType } from "@/lib/zama/types";
@@ -20,7 +24,7 @@ import { TIER_LABELS, VESTING_LABELS } from "@/lib/sample/data";
 import { CLOAKOPS_CONTRACT_ADDRESS, campaignTypeLabel } from "@/lib/config";
 import { resolveOnChainClients } from "@/lib/wagmi/on-chain-clients";
 import { cn, formatNumber } from "@/lib/utils";
-import { CheckCircle2, Lock, ShieldCheck, Wallet } from "lucide-react";
+import { CheckCircle2, Lock, Search, ShieldCheck, Wallet } from "lucide-react";
 
 export default function ClaimPage() {
   const { address, isConnected } = useAccount();
@@ -40,6 +44,11 @@ export default function ClaimPage() {
         Boolean(x.recipient),
       );
   }, [campaigns, address]);
+
+  const knownIds = useMemo(
+    () => new Set(myAllocations.map(({ campaign }) => campaign.id)),
+    [myAllocations],
+  );
 
   async function decryptField(
     handle: string,
@@ -80,33 +89,172 @@ export default function ClaimPage() {
             action={<ConnectButton />}
           />
         </div>
-      ) : myAllocations.length === 0 ? (
-        <div className="mt-8">
-          <EmptyState
-            icon={<ShieldCheck className="h-7 w-7" />}
-            title="No allocation found for this wallet"
-            description="Your address must be in the admin CSV when the campaign is created on Sepolia. Ask the campaign admin to include your wallet, then create the campaign from /admin."
-            action={
-              <Link href="/admin" className="btn-primary">
-                Go to admin
-              </Link>
-            }
-          />
-        </div>
       ) : (
         <div className="mt-8 space-y-6">
-          {myAllocations.map(({ campaign, recipient }) => (
-            <AllocationCard
-              key={`${campaign.id}-${recipient.wallet}`}
-              campaign={campaign}
-              recipient={recipient}
-              address={address!}
-              publicClient={publicClient}
-              decrypt={(handle, type) => decryptField(handle, type)}
+          {myAllocations.length === 0 ? (
+            <EmptyState
+              icon={<ShieldCheck className="h-7 w-7" />}
+              title="No saved allocation in this browser"
+              description="Allocations created in another browser aren't saved here. If your wallet was added as a recipient, look it up on-chain by campaign ID below."
             />
-          ))}
+          ) : (
+            myAllocations.map(({ campaign, recipient }) => (
+              <AllocationCard
+                key={`${campaign.id}-${recipient.wallet}`}
+                campaign={campaign}
+                recipient={recipient}
+                address={address!}
+                publicClient={publicClient}
+                decrypt={(handle, type) => decryptField(handle, type)}
+              />
+            ))
+          )}
+
+          <OnChainLookup
+            address={address!}
+            publicClient={publicClient}
+            knownIds={knownIds}
+            decrypt={(handle, type) => decryptField(handle, type)}
+          />
         </div>
       )}
+    </div>
+  );
+}
+
+function OnChainLookup({
+  address,
+  publicClient,
+  knownIds,
+  decrypt,
+}: {
+  address: string;
+  publicClient?: PublicClient;
+  knownIds: Set<string>;
+  decrypt: (handle: string, type: EncryptedFieldType) => Promise<bigint>;
+}) {
+  const [idInput, setIdInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [found, setFound] = useState<{
+    campaign: CampaignRecord;
+    recipient: RecipientRecord;
+  } | null>(null);
+
+  async function lookup() {
+    setError(null);
+    setFound(null);
+    const id = idInput.trim();
+    if (!id || !/^\d+$/.test(id)) {
+      setError("Enter a numeric campaign ID (e.g. 1).");
+      return;
+    }
+    if (!publicClient) {
+      setError("No RPC client. Reconnect on Sepolia.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const campaignId = BigInt(id);
+      const campaign = await readPublicCampaign(publicClient, campaignId);
+      if (!campaign) {
+        setError(`No campaign #${id} exists on this contract.`);
+        return;
+      }
+      const eligibility = await readRecipientEligibility(
+        publicClient,
+        campaignId,
+        address as `0x${string}`,
+      );
+      if (!eligibility.eligible) {
+        setError(
+          `This wallet is not a recipient of campaign #${id}. Make sure the admin added ${address}.`,
+        );
+        return;
+      }
+      const handles = await readRecipientHandles(
+        publicClient,
+        campaignId,
+        address as `0x${string}`,
+      );
+      const record: CampaignRecord = {
+        id,
+        onChainId: Number(campaignId),
+        name: campaign.name,
+        campaignType: campaign.campaignType,
+        totalBudget: campaign.totalBudget.toString(),
+        tokenAddress: campaign.token,
+        admin: campaign.admin,
+        claimStart: Number(campaign.claimStart),
+        claimEnd: Number(campaign.claimEnd),
+        recipients: [],
+        createdAt: Date.now(),
+        source: "onchain",
+      };
+      const recipient: RecipientRecord = {
+        wallet: address,
+        amountHandle: handles.amountHandle,
+        tierHandle: handles.tierHandle,
+        vestingHandle: handles.vestingHandle,
+        role: "—",
+        claimed: eligibility.claimed,
+      };
+      setFound({ campaign: record, recipient });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Lookup failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader
+          icon={<Search className="h-4 w-4" />}
+          title="Look up your allocation on-chain"
+          subtitle="Enter the campaign ID to check eligibility directly from Sepolia"
+        />
+        <CardBody>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              className="input flex-1"
+              placeholder="Campaign ID (e.g. 1)"
+              inputMode="numeric"
+              value={idInput}
+              onChange={(e) => setIdInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && lookup()}
+            />
+            <button
+              className="btn-primary shrink-0"
+              onClick={lookup}
+              disabled={loading || !idInput.trim()}
+            >
+              {loading ? "Looking up…" : "Look up"}
+            </button>
+          </div>
+          {error ? (
+            <p className="mt-3 text-xs text-cloak-danger">{error}</p>
+          ) : null}
+          <p className="mt-3 text-xs text-cloak-faint">
+            Find the campaign ID on the{" "}
+            <Link href="/public-audit" className="text-gold hover:underline">
+              Public Audit
+            </Link>{" "}
+            page (shown as #ID).
+          </p>
+        </CardBody>
+      </Card>
+
+      {found && !knownIds.has(found.campaign.id) ? (
+        <AllocationCard
+          campaign={found.campaign}
+          recipient={found.recipient}
+          address={address}
+          publicClient={publicClient}
+          decrypt={decrypt}
+        />
+      ) : null}
     </div>
   );
 }

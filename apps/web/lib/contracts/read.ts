@@ -50,6 +50,52 @@ export async function readRecipientHandles(
   };
 }
 
+export interface OnChainPublicCampaign {
+  admin: Address;
+  name: string;
+  metadataURI: string;
+  campaignType: number;
+  totalBudget: bigint;
+  recipientCount: bigint;
+  claimStart: bigint;
+  claimEnd: bigint;
+  claimedCount: bigint;
+  token: Address;
+  exists: boolean;
+}
+
+export async function readPublicCampaign(
+  publicClient: PublicClient,
+  campaignId: bigint,
+): Promise<OnChainPublicCampaign | null> {
+  const cfg = getContractConfig();
+  if (!cfg) return null;
+
+  try {
+    const c = (await publicClient.readContract({
+      ...cfg,
+      functionName: "getPublicCampaign",
+      args: [campaignId],
+    })) as {
+      admin: Address;
+      name: string;
+      metadataURI: string;
+      campaignType: number;
+      totalBudget: bigint;
+      recipientCount: bigint;
+      claimStart: bigint;
+      claimEnd: bigint;
+      claimedCount: bigint;
+      token: Address;
+      exists: boolean;
+    };
+    if (!c.exists) return null;
+    return c;
+  } catch {
+    return null;
+  }
+}
+
 export async function readRecipientEligibility(
   publicClient: PublicClient,
   campaignId: bigint,
