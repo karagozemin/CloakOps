@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
 import { StepIndicator, type StepStatus } from "@/components/ui/step-indicator";
 import { TokenOpsPanel } from "@/components/tokenops/tokenops-panel";
+import { CsvEditor } from "@/components/admin/csv-editor";
 import { useZama } from "@/lib/zama";
 import { useTokenOps } from "@/lib/tokenops/context";
 import { parseAllocationCsv, type CsvParseResult } from "@/lib/csv/parse";
@@ -303,11 +304,11 @@ export default function AdminPage() {
               }
             />
             <CardBody className="space-y-4">
-              <textarea
-                className="input mono min-h-[120px] text-xs"
-                placeholder={"wallet,allocation,tier,vestingClass,role\n0x…,25000,2,1,contributor"}
+              <CsvEditor
                 value={csvText}
-                onChange={(e) => setCsvText(e.target.value)}
+                onChange={setCsvText}
+                validCount={parseResult?.recipients.length ?? 0}
+                errorCount={parseResult?.errors.length ?? 0}
               />
 
               {parseResult ? (
