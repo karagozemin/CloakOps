@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-ink-950 text-cloak-fg antialiased;
+    background-image:
+      radial-gradient(60rem 40rem at 80% -10%, rgba(232, 185, 35, 0.06), transparent 60%),
+      radial-gradient(50rem 30rem at -10% 10%, rgba(91, 155, 213, 0.05), transparent 60%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: rgba(232, 185, 35, 0.25);
+  }
+  /* thin scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a313b transparent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-cloak-line bg-ink-850/70 shadow-card backdrop-blur-sm;
+  }
+  .card-pad {
+    @apply p-5 sm:p-6;
+  }
+  .label {
+    @apply text-xs font-medium uppercase tracking-wider text-cloak-muted;
+  }
+  .input {
+    @apply w-full rounded-lg border border-cloak-line bg-ink-900 px-3 py-2 text-sm text-cloak-fg
+      placeholder:text-cloak-faint focus:border-gold/60 focus:outline-none focus:ring-1 focus:ring-gold/40;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
+      transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-gold text-ink-950 hover:bg-gold-soft;
+  }
+  .btn-ghost {
+    @apply btn border border-cloak-line bg-ink-800 text-cloak-fg hover:border-gold/40 hover:bg-ink-700;
+  }
+  .btn-subtle {
+    @apply btn text-cloak-muted hover:text-cloak-fg;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-cloak-line bg-ink-800 px-2.5 py-1 text-xs font-medium;
+  }
+  .mono {
+    font-family: var(--font-mono);
+  }
+}

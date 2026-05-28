@@ -1,0 +1,121 @@
+/**
+ * TokenOps integration types.
+ *
+ * CloakOps treats TokenOps as the *campaign / distribution lifecycle rail*.
+ * The confidential allocation/tier/vesting metadata layer is owned by the Zama
+ * FHE contract (ConfidentialCampaign.sol). The adapter below never receives
+ * plaintext per-recipient allocations from the confidential layer — only the
+ * data a distribution rail legitimately needs (campaign metadata + recipient
+ * addresses + counts).
+ */
+
+export type TokenOpsMode = "real" | "demo";
+
+export interface TokenOpsStatus {
+  mode: TokenOpsMode;
+  connected: boolean;
+  /** Human label for the active provider, e.g. "@tokenops/sdk fhe-airdrop". */
+  provider: string;
+  sdkVersion?: string;
+  chainId: number;
+  chainSupported: boolean;
+  /** Resolved on-chain confidential-airdrop factory address (real mode). */
+  factoryAddress?: string;
+  /** Short status message for the UI. */
+  message: string;
+  /** Round-trip latency in ms for the status probe. */
+  latencyMs?: number;
+  capabilities: string[];
+}
+
+export interface CreateTokenOpsCampaignInput {
+  name: string;
+  campaignType: number;
+  /** Public, headline budget (already disclosed). */
+  totalBudget: string;
+  token: string;
+  admin: string;
+  claimStart: number;
+  claimEnd: number;
+  recipientCount: number;
+  /** Reference to the on-chain CloakOps campaign once it exists. */
+  cloakOpsCampaignId?: string;
+}
+
+export interface TokenOpsCampaignResult {
+  tokenOpsCampaignId: string;
+  status: "created" | "draft" | "pending";
+  createdAt: number;
+  /** Link into the TokenOps dashboard (when available). */
+  url?: string;
+  /** Tx hash when a real on-chain factory call was made. */
+  txHash?: string;
+}
+
+export interface SyncRecipientsInput {
+  tokenOpsCampaignId: string;
+  /** Addresses only — no plaintext allocations cross this boundary. */
+  recipients: string[];
+}
+
+export interface SyncRecipientsResult {
+  tokenOpsCampaignId: string;
+  synced: number;
+  status: "synced" | "partial";
+}
+
+export interface CreateDistributionOperationInput {
+  tokenOpsCampaignId: string;
+  /** "confidential" = ERC-7984 confidential rail; "standard" = plaintext rail. */
+  rail: "confidential" | "standard";
+  recipientCount: number;
+}
+
+export interface DistributionOperationResult {
+  operationId: string;
+  status: "queued" | "ready" | "executing";
+  rail: "confidential" | "standard";
+}
+
+export interface TokenOpsAnalytics {
+  tokenOpsCampaignId: string;
+  recipients: number;
+  claimed: number;
+  pending: number;
+  /** Public total only; per-recipient amounts stay encrypted. */
+  totalBudget: string;
+}
+
+export type TokenOpsLogLevel = "info" | "success" | "warn" | "error";
+
+export interface TokenOpsLogEntry {
+  id: string;
+  ts: number;
+  level: TokenOpsLogLevel;
+  op: string;
+  message: string;
+  meta?: Record<string, string | number | undefined>;
+}
+
+export type TokenOpsLogger = (
+  entry: Omit<TokenOpsLogEntry, "id" | "ts">,
+) => void;
+
+export interface TokenOpsAdapterOptions {
+  chainId: number;
+  onLog?: TokenOpsLogger;
+}
+
+/** The contract every TokenOps adapter (real or demo) must implement. */
+export interface TokenOpsCampaignAdapter {
+  readonly mode: TokenOpsMode;
+  getStatus(): Promise<TokenOpsStatus>;
+  createCampaign(
+    input: CreateTokenOpsCampaignInput,
+  ): Promise<TokenOpsCampaignResult>;
+  syncRecipients(input: SyncRecipientsInput): Promise<SyncRecipientsResult>;
+  createDistributionOperation(
+    input: CreateDistributionOperationInput,
+  ): Promise<DistributionOperationResult>;
+  getAnalytics(campaignId: string): Promise<TokenOpsAnalytics>;
+}

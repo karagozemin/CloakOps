@@ -1,0 +1,69 @@
+import { sepolia } from "viem/chains";
+
+export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 11155111);
+export const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME ?? "sepolia";
+
+export const CLOAKOPS_CONTRACT_ADDRESS = (process.env
+  .NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS ?? "") as `0x${string}` | "";
+
+export const TOKENOPS_MODE = (process.env.NEXT_PUBLIC_TOKENOPS_MODE ?? "demo") as
+  | "demo"
+  | "real";
+
+export const ZAMA_MODE = (process.env.NEXT_PUBLIC_ZAMA_MODE ?? "demo") as
+  | "demo"
+  | "real";
+
+export const WALLETCONNECT_PROJECT_ID =
+  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
+
+export const ACTIVE_CHAIN = sepolia;
+
+export const EXPLORER_BASE = "https://sepolia.etherscan.io";
+
+export function explorerAddress(address: string): string {
+  return `${EXPLORER_BASE}/address/${address}`;
+}
+
+export function explorerTx(hash: string): string {
+  return `${EXPLORER_BASE}/tx/${hash}`;
+}
+
+/** Campaign types — must match the on-chain enum order. */
+export const CAMPAIGN_TYPES = [
+  {
+    id: 0,
+    key: "private-round",
+    label: "Private Round",
+    blurb: "Seed / strategic investor allocations",
+  },
+  {
+    id: 1,
+    key: "contributor-reward",
+    label: "Contributor Rewards",
+    blurb: "Core + community contributor payouts",
+  },
+  {
+    id: 2,
+    key: "advisor-vesting",
+    label: "Advisor Vesting",
+    blurb: "Advisor grants on a vesting schedule",
+  },
+  {
+    id: 3,
+    key: "community-distribution",
+    label: "Community Distribution",
+    blurb: "Airdrops and community campaigns",
+  },
+] as const;
+
+export type CampaignTypeId = (typeof CAMPAIGN_TYPES)[number]["id"];
+
+export function campaignTypeLabel(id: number): string {
+  return CAMPAIGN_TYPES.find((t) => t.id === id)?.label ?? "Unknown";
+}
+
+export const isContractConfigured = Boolean(CLOAKOPS_CONTRACT_ADDRESS);
+
+export const hasLiveContractAddressNote =
+  "Not configured (set NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS after deploy)";
