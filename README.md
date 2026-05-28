@@ -44,7 +44,7 @@ adds the **confidential metadata layer**.
 | Track | What CloakOps demonstrates |
 | --- | --- |
 | **Zama Builder Track** | End-to-end FHE dApp: client encrypt → on-chain `euint64`/`euint8` storage → recipient `userDecrypt` → claim payout via `FHE.add` on `CloakConfidentialToken`. Deployed on Sepolia with the Zama Relayer SDK. |
-| **TokenOps Special Bounty** | `@tokenops/sdk` integration: campaign lifecycle sync, live vesting schedule link, recipient sync (addresses only — never plaintext amounts), operation log in the UI. See [`docs/tokenops-integration.md`](docs/tokenops-integration.md). |
+| **TokenOps Special Bounty** | Real `@tokenops/sdk/fhe-vesting` integration: reuse/deploy a confidential vesting manager, `setOperator` + `batchCreateVesting` to register stakeholders with **SDK-encrypted amounts**, on-chain stakeholder-count verification, and a live operation log in the UI. See [`docs/tokenops-integration.md`](docs/tokenops-integration.md). |
 
 ---
 

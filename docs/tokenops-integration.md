@@ -2,21 +2,25 @@
 
 CloakOps treats **TokenOps as the campaign / distribution lifecycle rail** and
 adds a **confidential allocation, tier, and vesting metadata layer with Zama
-FHE** on top. This document explains exactly where TokenOps is integrated, the
-real vs demo modes, what each side owns, and the honest limitations.
+FHE** on top. This document explains exactly where TokenOps is integrated, what
+the real integration does on-chain, what each side owns, and the honest
+limitations.
+
+The integration is **real-only** — there is no demo/simulation mode. Every
+TokenOps call goes through `@tokenops/sdk` against live Sepolia contracts.
 
 ## Where TokenOps lives in the code
 
 ```
 apps/web/lib/tokenops/
-  types.ts          # Adapter interface + DTOs + operation-log types
-  demo-adapter.ts   # DemoTokenOpsAdapter (default) — faithful lifecycle simulation
-  real-adapter.ts   # RealTokenOpsAdapter — wraps @tokenops/sdk fhe-airdrop, isolated
-  index.ts          # createTokenOpsAdapter(mode, opts) factory
-  context.tsx       # React provider: status, operation log, wrapped lifecycle calls
+  types.ts            # Adapter interface + DTOs + operation-log types
+  real-adapter.ts     # RealTokenOpsAdapter — wraps @tokenops/sdk/fhe-vesting
+  vesting-helpers.ts  # VestingParams mapping, setOperator, salt, relayer URL
+  index.ts            # createTokenOpsAdapter(opts) factory
+  context.tsx         # React provider: status, operation log, lifecycle calls
 apps/web/components/tokenops/
-  status-pill.tsx   # Header connection-status pill (mode + connection dot)
-  tokenops-panel.tsx# Full status card + live operation log
+  status-pill.tsx     # Header connection-status pill
+  tokenops-panel.tsx  # Status card (factory + manager) + live operation log
 ```
 
 The adapter contract (`TokenOpsCampaignAdapter`):
@@ -29,86 +33,109 @@ createDistributionOperation(input)
 getAnalytics(campaignId)
 ```
 
-This is the same shape in both modes, so the UI and admin flow are mode-agnostic.
+## The real `@tokenops/sdk` (v1.0.0)
 
-## Spike findings: the real `@tokenops/sdk`
+Following Zama's acquisition of TokenOps, the SDK is a **confidential token
+operations SDK** built on Zama FHE / the ERC-7984 confidential token standard.
+CloakOps uses the **confidential vesting** rail (not airdrop):
 
-We installed and inspected `@tokenops/sdk@1.0.0`. Following Zama's acquisition of
-TokenOps, the SDK is now a **confidential token operations SDK** built on Zama
-FHE / the ERC-7984 confidential token standard. Relevant entry points:
+- `@tokenops/sdk` — core: `getFheVestingFactoryAddress(chainId)`,
+  `getFheAirdropFactoryAddress(chainId)`, `SUPPORTED_CHAINS`, typed errors.
+- `@tokenops/sdk/fhe-vesting` — `createConfidentialVestingFactoryClient(...)`
+  (`createManager(...)`) and `createConfidentialVestingManagerClient(...)`
+  (`createVesting`, `batchCreateVesting`, `claim`, `getAllRecipientsLength`,
+  `maxBatchSize`, …). Also exports `erc7984OperatorAbi` for `setOperator`.
+- `@tokenops/sdk/fhe` — `createSepoliaEncryptorWeb(...)` wraps the Zama relayer
+  to encrypt `euint64` amounts in the browser.
 
-- `@tokenops/sdk` — core: `getFheAirdropFactoryAddress(chainId)`, `SUPPORTED_CHAINS`,
-  rich typed error classes.
-- `@tokenops/sdk/fhe-airdrop` — `createConfidentialAirdropFactoryClient(...)`
-  with `createConfidentialAirdrop(...)` / `createAndFundConfidentialAirdrop(...)`,
-  plus `createConfidentialAirdropClient(...)` for claim/view.
-- `@tokenops/sdk/fhe` — `createSepoliaEncryptorWeb(...)` / `createSepoliaEncryptor(...)`
-  which wrap the Zama relayer to encrypt `euint64` values in the browser/node.
-- `@tokenops/sdk/fhe-vesting`, `@tokenops/sdk/fhe-disperse` — confidential vesting
-  and bulk-transfer rails.
-
-`AirdropParams` shape used by the factory:
+`VestingParams` shape used per recipient:
 
 ```ts
-{ token: Address; startTimestamp: number; endTimestamp: number;
-  canExtendClaimWindow: boolean; admin: Address }
+{ recipient: Address; startTimestamp: number; endTimestamp: number;
+  cliffSeconds: number; releaseIntervalSecs: number; timelockSeconds: number;
+  initialUnlockBps: number; cliffAmountBps: number; isRevocable: boolean }
 ```
 
-## Real mode (`NEXT_PUBLIC_TOKENOPS_MODE=real`)
+## What the integration does (real, on-chain)
 
 `RealTokenOpsAdapter` dynamically imports the SDK (kept out of the default
-bundle) and:
+bundle) and runs three steps, all wired into the admin create flow
+(`lib/campaigns/create-flow.ts`):
 
-- **getStatus** resolves the on-chain confidential-airdrop factory address via
-  `getFheAirdropFactoryAddress(chainId)` and reports whether the chain is
-  supported. This is a genuine SDK call, not a mock.
-- **createCampaign** builds a `createSepoliaEncryptorWeb` encryptor + a
-  `ConfidentialAirdropFactoryClient` and calls `createConfidentialAirdrop(...)`,
-  returning the deployed clone address and tx hash.
+### 1. `getStatus`
+Resolves the on-chain confidential-**vesting** factory via
+`getFheVestingFactoryAddress(chainId)` and reports the configured manager
+(`NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT`). Genuine SDK call.
 
-### Real-mode prerequisites and limitations (honest)
+### 2. `createCampaign`
+- If `NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT` is set (default), **reuses** that
+  vesting manager clone — no redeploy tx, links to the existing
+  app.tokenops.xyz schedule.
+- Otherwise deploys a fresh manager via `factory.createManager({ token, userSalt })`
+  and reads the address from the `ManagerCreated` event. The salt is derived
+  deterministically from the CloakOps campaign id.
 
-Creating and funding a **live** confidential airdrop requires:
+### 3. `syncRecipients` (the real stakeholder write)
+1. `setOperator(manager, deadline)` on the ERC-7984 token — authorises the
+   manager to pull the admin's confidential tokens (one wallet signature).
+2. Builds a `createSepoliaEncryptorWeb` encryptor (Zama relayer).
+3. `batchCreateVesting({ items })` — each item carries a `VestingParams` plus a
+   **plaintext `bigint` amount that the SDK encrypts** before submission.
+   Batches respect `maxBatchSize()`.
 
-1. A TokenOps confidential-airdrop factory deployed on the target chain (the SDK
-   resolves the address; if none exists for the chain, status reports it clearly).
-2. A connected wallet (viem `walletClient` + account) to sign the deploy tx.
-3. A funded ERC-7984 confidential token to fund the claim set.
+Vesting class → schedule mapping (`vesting-helpers.ts > buildVestingParams`):
 
-When these are not present, the adapter does **not** fake success — it surfaces a
-clear `TokenOpsRealModeError` / honest status message. Because the hackathon MVP
-does not deploy to a live funded environment, **demo mode is the default** so the
-end-to-end story always runs.
+| CloakOps vesting class | TokenOps schedule |
+| --- | --- |
+| `0` | Fully unlocked at claim start (`initialUnlockBps = 10000`) |
+| `n > 0` | `n × 30 days` cliff, daily linear release to claim end |
 
-## Demo mode (`NEXT_PUBLIC_TOKENOPS_MODE=demo`, default)
+### `createDistributionOperation` / `getAnalytics`
+Read-only verification — calls `getAllRecipientsLength()` on the manager so the
+operation log reflects the real on-chain stakeholder count.
 
-`DemoTokenOpsAdapter` is a faithful simulation of the same lifecycle
-(create campaign -> sync recipients -> create confidential distribution
-operation -> analytics) with realistic latency and a streamed operation log. It
-mirrors the real SDK's method shapes so the demo is honest about *what* TokenOps
-does, without requiring credentials, a funded wallet, or a deployed factory.
+## Prerequisites for a successful sync (honest)
+
+`syncRecipients` will **revert** unless:
+
+1. `NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN` is the exact ERC-7984 token the manager
+   was deployed with (e.g. the CTestToken on the linked schedule).
+2. The connected admin wallet holds a **confidential balance** of that token at
+   least equal to the campaign's total allocation.
+3. The wallet is on Sepolia and signs both the `setOperator` and
+   `batchCreateVesting` transactions.
+
+If the token/funding are missing the SDK throws a typed error which surfaces in
+the TokenOps operation log — the adapter never fakes success.
 
 ## Division of responsibility
 
 | Concern | Owner |
 | --- | --- |
-| Campaign lifecycle, recipient set, distribution operation | **TokenOps** (rail) |
+| Campaign lifecycle, vesting schedules, stakeholder set | **TokenOps** (`@tokenops/sdk/fhe-vesting`) |
 | Confidential allocation amount / tier / vesting metadata | **CloakOps + Zama FHE** (`ConfidentialCampaign.sol`) |
 | Per-recipient decryption authorization | **Zama FHE ACL** (`FHE.allow`) |
 | Public budget, rules, claim window, claimed count | **CloakOps contract** (public state) |
 
 ## Privacy boundary at the TokenOps edge
 
-The confidential layer **never** passes plaintext per-recipient allocations into
-the TokenOps adapter. `syncRecipients` receives **addresses and counts only**.
-Encrypted allocation handles live on `ConfidentialCampaign.sol`. This keeps the
-"private allocations, public rules" guarantee intact across the integration
-boundary.
+Per-recipient amounts that reach TokenOps are **encrypted by the SDK** before
+they touch the chain — the plaintext allocation never lands in TokenOps'
+public state, and the CloakOps `ConfidentialCampaign` ledger remains the
+canonical encrypted source. Recipient addresses and the public schedule
+metadata (start/end, counts) are visible, consistent with the
+"private allocations, public rules" model.
 
 ## Environment variables
 
 ```env
-NEXT_PUBLIC_TOKENOPS_MODE=demo   # or "real"
-TOKENOPS_API_KEY=                # reserved for hosted TokenOps API features
-TOKENOPS_API_BASE_URL=
+# Reuse the manager behind your app.tokenops.xyz schedule (no redeploy tx):
+NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT=0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494
+NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_ID=6a189b396f763543bff332be
+NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL=https://app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be
+
+# REQUIRED for syncRecipients — the ERC-7984 token the manager accepts.
+# Must match the manager's immutable token, and the admin wallet must hold a
+# confidential balance of it. If empty, falls back to NEXT_PUBLIC_CLOAKOPS_TOKEN_ADDRESS.
+NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN=
 ```
