@@ -1,5 +1,12 @@
+import type { Address, PublicClient, WalletClient } from "viem";
 import type { ParsedRecipient } from "@/lib/csv/parse";
 import type { ZamaProvider } from "@/lib/zama/types";
+import { ZAMA_MODE } from "@/lib/config";
+import { hasLiveContract } from "@/lib/contracts";
+import {
+  batchAddRecipientsOnChain,
+  createCampaignOnChain,
+} from "@/lib/contracts/write";
 import type {
   CreateTokenOpsCampaignInput,
   SyncRecipientsInput,
@@ -42,13 +49,21 @@ export interface TokenOpsBridge {
   ) => Promise<DistributionOperationResult>;
 }
 
+export interface OnChainClients {
+  walletClient: WalletClient;
+  publicClient: PublicClient;
+  account: Address;
+}
+
 export interface RunCreateCampaignArgs {
   input: CreateCampaignInput;
   recipients: ParsedRecipient[];
   zama: ZamaProvider;
   tokenops: TokenOpsBridge;
+  /** ConfidentialCampaign.sol address (not the ERC-20 token). */
   contractAddress: string;
   onStep: (key: FlowStepKey, status: FlowStepStatus, detail?: string) => void;
+  onChain?: OnChainClients;
 }
 
 function nextLocalId(): { id: string; onChainId: number } {
@@ -73,18 +88,27 @@ function randomTxHash(): string {
 }
 
 /**
- * Orchestrates the confidential campaign creation lifecycle and streams status
- * to the UI step indicator:
- *   parse -> encrypt (Zama FHE) -> submit (contract) -> sync (TokenOps) -> ready
+ * Orchestrates the confidential campaign creation lifecycle:
+ * parse → encrypt (Zama FHE) → submit (contract) → sync (TokenOps) → ready
  */
 export async function runCreateCampaign(
   args: RunCreateCampaignArgs,
 ): Promise<CampaignRecord> {
-  const { input, recipients, zama, tokenops, contractAddress, onStep } = args;
+  const {
+    input,
+    recipients,
+    zama,
+    tokenops,
+    contractAddress,
+    onStep,
+    onChain,
+  } = args;
+
+  const realOnChain = ZAMA_MODE === "real" && hasLiveContract && Boolean(onChain);
 
   onStep("parse", "done", `${recipients.length} recipients validated.`);
 
-  // 1) Encrypt allocations/tiers/vesting with Zama FHE.
+  // 1) Encrypt with Zama FHE (real relayer or demo provider).
   onStep("encrypt", "active");
   let encrypted;
   try {
@@ -96,26 +120,84 @@ export async function runCreateCampaign(
     onStep(
       "encrypt",
       "done",
-      `${recipients.length} allocations encrypted (euint64 / euint8).`,
+      `${recipients.length} allocations encrypted (${zama.mode} mode).`,
     );
   } catch (err) {
     onStep("encrypt", "error", errMsg(err));
     throw err;
   }
 
-  // 2) Submit to the confidential contract (simulated unless a live contract
-  //    + real Zama mode are configured; demo mode records a local campaign).
+  // 2) Submit to ConfidentialCampaign.sol (on-chain in real mode).
   onStep("submit", "active");
-  const { id, onChainId } = nextLocalId();
-  const txHash = randomTxHash();
-  await delay(700);
-  onStep(
-    "submit",
-    "done",
-    `Campaign #${onChainId} recorded (tx ${txHash.slice(0, 10)}…).`,
-  );
+  let id: string;
+  let onChainId: number;
+  let txHash: string;
+  let source: CampaignRecord["source"] = "demo";
 
-  // 3) Sync the campaign lifecycle to TokenOps.
+  if (realOnChain && onChain) {
+    try {
+      const { hash, campaignId } = await createCampaignOnChain(
+        onChain.walletClient,
+        onChain.publicClient,
+        onChain.account,
+        {
+          name: input.name,
+          metadataURI: input.metadataURI ?? "ipfs://cloakops-campaign",
+          campaignType: input.campaignType,
+          totalBudget: BigInt(input.totalBudget),
+          claimStart: BigInt(input.claimStart),
+          claimEnd: BigInt(input.claimEnd),
+          token: input.tokenAddress as Address,
+        },
+      );
+
+      const addHash = await batchAddRecipientsOnChain(
+        onChain.walletClient,
+        onChain.publicClient,
+        onChain.account,
+        {
+          campaignId,
+          wallets: recipients.map((r) => r.wallet as Address),
+          amountHandles: encrypted.recipients.map(
+            (r) => r.amountHandle as `0x${string}`,
+          ),
+          tierHandles: encrypted.recipients.map(
+            (r) => r.tierHandle as `0x${string}`,
+          ),
+          vestingHandles: encrypted.recipients.map(
+            (r) => r.vestingHandle as `0x${string}`,
+          ),
+          inputProof: encrypted.inputProof as `0x${string}`,
+        },
+      );
+
+      onChainId = Number(campaignId);
+      id = String(onChainId);
+      txHash = addHash;
+      source = "onchain";
+      onStep(
+        "submit",
+        "done",
+        `Campaign #${onChainId} on Sepolia (tx ${txHash.slice(0, 10)}…).`,
+      );
+    } catch (err) {
+      onStep("submit", "error", errMsg(err));
+      throw err;
+    }
+  } else {
+    const local = nextLocalId();
+    id = local.id;
+    onChainId = local.onChainId;
+    txHash = randomTxHash();
+    await delay(700);
+    onStep(
+      "submit",
+      "done",
+      `Campaign #${onChainId} recorded locally (demo submit).`,
+    );
+  }
+
+  // 3) TokenOps lifecycle.
   onStep("tokenops", "active");
   let tokenOpsResult: TokenOpsCampaignResult;
   try {
@@ -145,7 +227,7 @@ export async function runCreateCampaign(
     throw err;
   }
 
-  // 4) Persist the campaign record.
+  // 4) Persist for UI.
   onStep("ready", "active");
   const record: CampaignRecord = {
     id,
@@ -168,7 +250,7 @@ export async function runCreateCampaign(
     tokenOpsCampaignId: tokenOpsResult.tokenOpsCampaignId,
     tokenOpsUrl: tokenOpsResult.url,
     notes: input.notes,
-    source: "demo",
+    source,
   };
   campaignStore.upsert(record);
   onStep("ready", "done", "Campaign live.");

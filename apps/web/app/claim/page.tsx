@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useAccount } from "wagmi";
+import type { PublicClient, WalletClient } from "viem";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
@@ -14,7 +15,8 @@ import type { CampaignRecord, RecipientRecord } from "@/lib/campaigns/types";
 import { DemoZamaProvider } from "@/lib/zama/demo-provider";
 import { useZama } from "@/lib/zama";
 import { TIER_LABELS, VESTING_LABELS } from "@/lib/demo/data";
-import { campaignTypeLabel } from "@/lib/config";
+import { campaignTypeLabel, CLOAKOPS_CONTRACT_ADDRESS, ZAMA_MODE } from "@/lib/config";
+import { claimOnChain } from "@/lib/contracts/write";
 import { cn, formatNumber, shortAddress } from "@/lib/utils";
 import {
   CheckCircle2,
@@ -26,11 +28,14 @@ import {
 
 export default function ClaimPage() {
   const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
   const campaigns = useCampaigns();
-  const { provider: realProvider } = useZama();
+  const { provider: zamaProvider, mode: zamaMode } = useZama();
   const [adding, setAdding] = useState(false);
 
   const demoProvider = useMemo(() => new DemoZamaProvider(), []);
+  const decryptProvider = zamaMode === "real" ? zamaProvider : demoProvider;
 
   const myAllocations = useMemo(() => {
     if (!address) return [];
@@ -116,16 +121,16 @@ export default function ClaimPage() {
               campaign={campaign}
               recipient={recipient}
               address={address!}
-              decrypt={async (handle, type) => {
-                const provider =
-                  campaign.source === "onchain" ? realProvider : demoProvider;
-                return provider.decryptValue(
+              walletClient={walletClient}
+              publicClient={publicClient}
+              decrypt={(handle, type) =>
+                decryptProvider.decryptValue(
                   handle,
-                  campaign.tokenAddress,
+                  CLOAKOPS_CONTRACT_ADDRESS || campaign.tokenAddress,
                   address!,
                   type,
-                );
-              }}
+                )
+              }
             />
           ))}
         </div>
@@ -138,11 +143,15 @@ function AllocationCard({
   campaign,
   recipient,
   address,
+  walletClient,
+  publicClient,
   decrypt,
 }: {
   campaign: CampaignRecord;
   recipient: RecipientRecord;
   address: string;
+  walletClient?: WalletClient;
+  publicClient?: PublicClient;
   decrypt: (handle: string, type: "euint64" | "euint8") => Promise<bigint>;
 }) {
   const [claimed, setClaimed] = useState(recipient.claimed);
@@ -155,7 +164,22 @@ function AllocationCard({
   async function handleClaim() {
     setClaiming(true);
     try {
-      await new Promise((r) => setTimeout(r, 700));
+      if (
+        ZAMA_MODE === "real" &&
+        campaign.source === "onchain" &&
+        walletClient &&
+        publicClient &&
+        campaign.onChainId
+      ) {
+        await claimOnChain(
+          walletClient,
+          publicClient,
+          address as `0x${string}`,
+          BigInt(campaign.onChainId),
+        );
+      } else {
+        await new Promise((r) => setTimeout(r, 700));
+      }
       campaignStore.markClaimed(campaign.id, address);
       setClaimed(true);
     } finally {

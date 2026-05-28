@@ -105,31 +105,34 @@ export class RealZamaProvider implements ZamaProvider {
   ): Promise<BatchEncryptResult> {
     const relayer = await this.ensureRelayer();
 
-    // One encrypt call per recipient keeps proofs scoped + simple. (The on-chain
-    // addRecipient consumes one proof per recipient.)
-    const encryptedRecipients = [];
-    let lastProof = "0x";
+    // Single encrypt call → one shared inputProof for batchAddRecipients.
+    const values: { value: bigint; type: string }[] = [];
     for (const r of recipients) {
-      const result = await relayer.encrypt({
-        contractAddress: contractAddress as Address,
-        userAddress: userAddress as Address,
-        values: [
-          { value: BigInt(r.allocation), type: "euint64" },
-          { value: BigInt(r.tier), type: "euint8" },
-          { value: BigInt(r.vestingClass), type: "euint8" },
-        ],
-      });
-      const handles: Uint8Array[] = result.handles;
-      lastProof = toHex(result.inputProof);
-      encryptedRecipients.push({
-        wallet: r.wallet,
-        amountHandle: toHex(handles[0]),
-        tierHandle: toHex(handles[1]),
-        vestingHandle: toHex(handles[2]),
-      });
+      values.push(
+        { value: BigInt(r.allocation), type: "euint64" },
+        { value: BigInt(r.tier), type: "euint8" },
+        { value: BigInt(r.vestingClass), type: "euint8" },
+      );
     }
 
-    return { recipients: encryptedRecipients, inputProof: lastProof };
+    const result = await relayer.encrypt({
+      contractAddress: contractAddress as Address,
+      userAddress: userAddress as Address,
+      values,
+    });
+
+    const handles = result.handles;
+    const encryptedRecipients = recipients.map((r, i) => ({
+      wallet: r.wallet,
+      amountHandle: toHex(handles[i * 3]),
+      tierHandle: toHex(handles[i * 3 + 1]),
+      vestingHandle: toHex(handles[i * 3 + 2]),
+    }));
+
+    return {
+      recipients: encryptedRecipients,
+      inputProof: toHex(result.inputProof),
+    };
   }
 
   async decryptValue(

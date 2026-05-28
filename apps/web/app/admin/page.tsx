@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useAccount } from "wagmi";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
@@ -17,8 +17,9 @@ import {
   type FlowStepStatus,
 } from "@/lib/campaigns/create-flow";
 import type { CampaignRecord } from "@/lib/campaigns/types";
-import { CAMPAIGN_TYPES } from "@/lib/config";
-import { DEMO_CAMPAIGN, DEMO_CSV, DEMO_TOKEN_ADDRESS } from "@/lib/demo/data";
+import { CAMPAIGN_TYPES, CLOAKOPS_CONTRACT_ADDRESS, ZAMA_MODE } from "@/lib/config";
+import { DEPLOYED_TOKEN_ADDRESS } from "@/lib/contracts/deployed-address";
+import { DEMO_CAMPAIGN, DEMO_CSV } from "@/lib/demo/data";
 import { cn, formatNumber, shortAddress, toUnixSeconds } from "@/lib/utils";
 import {
   ArrowRight,
@@ -44,8 +45,10 @@ function defaultLocalDateTime(offsetDays = 0): string {
 }
 
 export default function AdminPage() {
-  const { address } = useAccount();
-  const { provider: zama, status: zamaStatus } = useZama();
+  const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const { provider: zama, status: zamaStatus, mode: zamaMode } = useZama();
   const tokenops = useTokenOps();
 
   const [name, setName] = useState("");
@@ -76,7 +79,7 @@ export default function AdminPage() {
     setName(DEMO_CAMPAIGN.name);
     setCampaignType(DEMO_CAMPAIGN.campaignType);
     setTotalBudget(DEMO_CAMPAIGN.totalBudget);
-    setTokenAddress(DEMO_TOKEN_ADDRESS);
+    setTokenAddress(DEPLOYED_TOKEN_ADDRESS);
     setNotes(DEMO_CAMPAIGN.notes);
     setClaimStart(defaultLocalDateTime(0));
     setClaimEnd(defaultLocalDateTime(DEMO_CAMPAIGN.claimWindowDays));
@@ -99,6 +102,12 @@ export default function AdminPage() {
       return "Add at least one recipient via CSV.";
     if (parseResult.errors.length > 0)
       return "Fix the CSV validation errors first.";
+    if (ZAMA_MODE === "real" && !isConnected) {
+      return "Connect your wallet on Sepolia for real mode (on-chain txs + FHE).";
+    }
+    if (ZAMA_MODE === "real" && !CLOAKOPS_CONTRACT_ADDRESS) {
+      return "NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS is not configured.";
+    }
     if (toUnixSeconds(claimEnd) <= toUnixSeconds(claimStart))
       return "Claim end must be after claim start.";
     return null;
@@ -139,8 +148,19 @@ export default function AdminPage() {
         recipients: parseResult!.recipients,
         zama,
         tokenops,
-        contractAddress: tokenAddress.trim(),
+        contractAddress: CLOAKOPS_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000",
         onStep,
+        onChain:
+          ZAMA_MODE === "real" &&
+          walletClient &&
+          publicClient &&
+          address
+            ? {
+                walletClient,
+                publicClient,
+                account: address,
+              }
+            : undefined,
       });
       setCreated(record);
     } catch {
@@ -356,9 +376,17 @@ export default function AdminPage() {
             <CardBody className="space-y-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-cloak-muted">Mode</span>
-                <Badge tone={zamaStatus?.mode === "real" ? "gold" : "neutral"}>
-                  {zamaStatus?.mode === "real" ? "Relayer SDK" : "Demo encryption"}
+                <Badge tone={zamaMode === "real" ? "gold" : "neutral"}>
+                  {zamaMode === "real" ? "Relayer SDK" : "Demo encryption"}
                 </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-cloak-muted">Contract</span>
+                <span className="mono text-xs text-cloak-fg">
+                  {CLOAKOPS_CONTRACT_ADDRESS
+                    ? shortAddress(CLOAKOPS_CONTRACT_ADDRESS, 4)
+                    : "not set"}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-cloak-muted">Status</span>

@@ -13,3 +13,9 @@ export function getContractConfig() {
     abi: confidentialCampaignAbi,
   } as const;
 }
+
+export {
+  batchAddRecipientsOnChain,
+  claimOnChain,
+  createCampaignOnChain,
+} from "./write";
