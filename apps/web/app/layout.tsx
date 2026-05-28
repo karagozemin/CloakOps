@@ -18,6 +18,22 @@ export const metadata: Metadata = {
     "airdrop",
     "vesting",
   ],
+  icons: {
+    icon: "/brand/cloakops-logo.png",
+    apple: "/brand/cloakops-logo.png",
+  },
+  openGraph: {
+    title: "CloakOps — Confidential campaign layer for TokenOps",
+    description:
+      "Private allocations. Public rules. TokenOps execution. Built on Zama FHE.",
+    images: [{ url: "/brand/cloakops-logo.png", width: 512, height: 512, alt: "CloakOps" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CloakOps",
+    description: "Private allocations. Public rules. TokenOps execution.",
+    images: ["/brand/cloakops-logo.png"],
+  },
 };
 
 export default function RootLayout({

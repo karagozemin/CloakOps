@@ -1,6 +1,8 @@
-# CloakOps
+<p align="center">
+  <img src="docs/brand/cloakops-logo.png" alt="CloakOps" width="250" />
+</p>
 
-**Private allocations. Public rules. TokenOps execution.**
+<p align="center"><strong>Private allocations. Public rules. TokenOps execution.</strong></p>
 
 CloakOps is a **confidential campaign layer for TokenOps**, built on **Zama FHE**.
 Token teams run private rounds, contributor rewards, advisor vesting, and
