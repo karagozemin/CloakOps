@@ -1,7 +1,7 @@
 import type { Address } from "viem";
 import type { ParsedRecipient } from "@/lib/csv/parse";
 import type { ZamaProvider } from "@/lib/zama/types";
-import { tokenOpsVestingLink } from "@/lib/config";
+import { tokenOpsVestingLink, tokenOpsVestingToken } from "@/lib/config";
 import { hasLiveContract } from "@/lib/contracts";
 import type { OnChainClients } from "@/lib/wagmi/on-chain-clients";
 export type { OnChainClients } from "@/lib/wagmi/on-chain-clients";
@@ -172,12 +172,13 @@ export async function runCreateCampaign(
 
   let tokenOpsResult: TokenOpsCampaignResult;
   try {
-    onStep("tokenops", "active", "Syncing campaign to TokenOps…");
+    onStep("tokenops", "active", "Connecting to TokenOps vesting manager…");
     tokenOpsResult = await tokenops.createCampaign({
       name: input.name,
       campaignType: input.campaignType,
       totalBudget: input.totalBudget,
       token: input.tokenAddress,
+      vestingToken: tokenOpsVestingToken(input.tokenAddress),
       admin: input.admin,
       claimStart: input.claimStart,
       claimEnd: input.claimEnd,
@@ -185,16 +186,31 @@ export async function runCreateCampaign(
       cloakOpsCampaignId: id,
       onChain,
     });
+
+    onStep(
+      "tokenops",
+      "active",
+      "Approve TokenOps operator, then confirm vesting schedules in your wallet…",
+    );
     await tokenops.syncRecipients({
       tokenOpsCampaignId: tokenOpsResult.tokenOpsCampaignId,
-      recipients: recipients.map((r) => r.wallet),
+      token: tokenOpsVestingToken(input.tokenAddress),
+      claimStart: input.claimStart,
+      claimEnd: input.claimEnd,
+      recipients: recipients.map((r) => ({
+        wallet: r.wallet,
+        allocation: r.allocation,
+        vestingClass: r.vestingClass,
+      })),
+      onChain,
     });
+
     await tokenops.createDistributionOperation({
       tokenOpsCampaignId: tokenOpsResult.tokenOpsCampaignId,
       rail: "confidential",
       recipientCount: recipients.length,
     });
-    onStep("tokenops", "done", "Campaign synced to TokenOps.");
+    onStep("tokenops", "done", "Stakeholders synced to TokenOps vesting.");
   } catch (err) {
     onStep("tokenops", "error", errMsg(err));
     throw err;
@@ -220,7 +236,7 @@ export async function runCreateCampaign(
     createdAt: Date.now(),
     txHash,
     tokenOpsCampaignId:
-      tokenOpsResult.tokenOpsCampaignId ?? tokenOpsVestingLink()?.id,
+      tokenOpsResult.tokenOpsCampaignId ?? tokenOpsResult.managerAddress,
     tokenOpsUrl: tokenOpsResult.url ?? tokenOpsVestingLink()?.url,
     notes: input.notes,
     source: "onchain",

@@ -399,8 +399,9 @@ export default function AdminPage() {
               <div className="rounded-lg border border-gold/20 bg-gold/5 p-3 text-xs text-cloak-muted">
                 <Lock className="mr-1.5 inline h-3 w-3 text-gold" />
                 Allocations, tiers, and vesting are encrypted client-side with{" "}
-                Zama before submission. TokenOps only ever receives recipient
-                addresses — never plaintext amounts.
+                Zama before submission. TokenOps vesting receives encrypted
+                allocations via `@tokenops/sdk` — plaintext amounts stay off the
+                public dashboard.
               </div>
 
               <StepIndicator steps={STEPS} statuses={statuses} />

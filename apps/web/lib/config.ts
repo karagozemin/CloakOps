@@ -79,9 +79,40 @@ export const TOKENOPS_VESTING_CONTRACT = (process.env
   .NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT ??
   "0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494") as `0x${string}`;
 
+/**
+ * ERC-7984 token the configured vesting manager accepts.
+ * Must match the manager's immutable token (e.g. CTestToken on the linked schedule).
+ */
+export const TOKENOPS_VESTING_TOKEN = (process.env
+  .NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN ?? "") as `0x${string}` | "";
+
 export const TOKENOPS_VESTING_SCHEDULE_URL =
   process.env.NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL ??
   `https://app.tokenops.xyz/contract/schedules/${TOKENOPS_VESTING_SCHEDULE_ID}`;
+
+/** ERC-7984 token for TokenOps vesting txs — env override or CloakOps token. */
+export function tokenOpsVestingToken(
+  campaignToken?: string,
+): `0x${string}` {
+  if (TOKENOPS_VESTING_TOKEN) return TOKENOPS_VESTING_TOKEN;
+  if (campaignToken) return campaignToken as `0x${string}`;
+  if (CLOAKOPS_TOKEN_ADDRESS) return CLOAKOPS_TOKEN_ADDRESS;
+  throw new Error(
+    "Set NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN or NEXT_PUBLIC_CLOAKOPS_TOKEN_ADDRESS.",
+  );
+}
+
+/** TokenOps dashboard URL when the manager matches the configured schedule. */
+export function tokenOpsDashboardUrl(managerAddress: string): string | undefined {
+  const link = tokenOpsVestingLink();
+  if (
+    link &&
+    managerAddress.toLowerCase() === link.contract.toLowerCase()
+  ) {
+    return link.url;
+  }
+  return undefined;
+}
 
 /** Live TokenOps vesting rail link when schedule id is configured. */
 export function tokenOpsVestingLink():
