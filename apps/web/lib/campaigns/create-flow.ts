@@ -102,13 +102,18 @@ export async function runCreateCampaign(
     throw err;
   }
 
-  onStep("submit", "active");
+  onStep(
+    "submit",
+    "active",
+    "Confirm campaign creation in your wallet…",
+  );
   let id: string;
   let onChainId: number;
   let txHash: string;
 
+  let campaignId: bigint;
   try {
-    const { campaignId } = await createCampaignOnChain(
+    ({ campaignId } = await createCampaignOnChain(
       onChain.walletClient,
       onChain.publicClient,
       onChain.account,
@@ -121,8 +126,25 @@ export async function runCreateCampaign(
         claimEnd: BigInt(input.claimEnd),
         token: input.tokenAddress as Address,
       },
+    ));
+    onChainId = Number(campaignId);
+    id = String(onChainId);
+    onStep(
+      "submit",
+      "done",
+      `Campaign #${onChainId} created on Sepolia.`,
     );
+  } catch (err) {
+    onStep("submit", "error", errMsg(err));
+    throw err;
+  }
 
+  onStep(
+    "tokenops",
+    "active",
+    "Confirm encrypted recipient batch in your wallet…",
+  );
+  try {
     const addHash = await batchAddRecipientsOnChain(
       onChain.walletClient,
       onChain.publicClient,
@@ -142,23 +164,15 @@ export async function runCreateCampaign(
         inputProof: encrypted.inputProof as `0x${string}`,
       },
     );
-
-    onChainId = Number(campaignId);
-    id = String(onChainId);
     txHash = addHash;
-    onStep(
-      "submit",
-      "done",
-      `Campaign #${onChainId} on Sepolia (tx ${txHash.slice(0, 10)}…).`,
-    );
   } catch (err) {
-    onStep("submit", "error", errMsg(err));
+    onStep("tokenops", "error", errMsg(err));
     throw err;
   }
 
-  onStep("tokenops", "active");
   let tokenOpsResult: TokenOpsCampaignResult;
   try {
+    onStep("tokenops", "active", "Syncing campaign to TokenOps…");
     tokenOpsResult = await tokenops.createCampaign({
       name: input.name,
       campaignType: input.campaignType,
