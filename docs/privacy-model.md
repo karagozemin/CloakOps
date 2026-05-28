@@ -70,12 +70,6 @@ Encrypted allocation handles live exclusively on `ConfidentialCampaign.sol`.
 This preserves the "private allocations, public rules" guarantee across the
 integration boundary.
 
-## Dual-mode and the demo
-
-In **demo mode**, encryption is simulated locally: values produce opaque random
-handles and the cleartext is recoverable only through the demo provider, gated
-in the UI by wallet ownership — faithfully reproducing the "only the recipient
-can decrypt" guarantee without a deployed contract or relayer. In **real mode**,
-the Zama Relayer SDK performs genuine encryption and user decryption against the
-deployed contract. The privacy semantics are identical; only the cryptographic
-backend differs.
+On claim, the still-encrypted allocation is credited to the recipient's
+confidential token balance via `FHE.add` inside `CloakConfidentialToken` — the
+payout amount never appears in plaintext on-chain.
