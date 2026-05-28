@@ -21,7 +21,7 @@ export default function LandingPage() {
       <section className="relative overflow-hidden py-16 sm:py-24">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-grid-faint [background-size:32px_32px] opacity-40" />
         <div className="mx-auto max-w-3xl text-center">
-          <div className="mb-8 flex justify-center">
+          <div className="mb-6 flex justify-center">
             <Logo size="2xl" priority className="drop-shadow-glow" />
           </div>
           <Badge tone="gold" className="mb-6">
