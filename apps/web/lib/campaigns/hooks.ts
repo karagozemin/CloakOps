@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { campaignStore } from "./store";
 import type { CampaignRecord } from "./types";
 import { DemoZamaProvider } from "@/lib/zama/demo-provider";
+import { tokenOpsVestingLink } from "@/lib/config";
 import {
   DEMO_CAMPAIGN,
   DEMO_RECIPIENTS,
@@ -23,7 +24,22 @@ function markSeedDone() {
 }
 
 async function seedDemoCampaign() {
-  if (campaignStore.get("1")) return;
+  const vesting = tokenOpsVestingLink();
+  const existing = campaignStore.get("1");
+  if (existing) {
+    if (
+      vesting &&
+      (existing.tokenOpsUrl !== vesting.url ||
+        existing.tokenOpsCampaignId !== vesting.id)
+    ) {
+      campaignStore.upsert({
+        ...existing,
+        tokenOpsCampaignId: vesting.id,
+        tokenOpsUrl: vesting.url,
+      });
+    }
+    return;
+  }
   const provider = new DemoZamaProvider();
   const enc = await provider.encryptBatch(DEMO_CONTRACT, DEMO_ADMIN, DEMO_RECIPIENTS);
   if (campaignStore.get("1")) return; // re-check after async
@@ -46,8 +62,8 @@ async function seedDemoCampaign() {
       claimed: false,
     })),
     createdAt: Date.now(),
-    tokenOpsCampaignId: "tops_demoseed01",
-    tokenOpsUrl: "https://app.tokenops.xyz/campaigns/tops_demoseed01",
+    tokenOpsCampaignId: vesting?.id,
+    tokenOpsUrl: vesting?.url,
     notes: DEMO_CAMPAIGN.notes,
     source: "demo",
   };

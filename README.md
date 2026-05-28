@@ -148,8 +148,22 @@ Then set the frontend env and enable real mode:
 NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS=0x...
 NEXT_PUBLIC_ZAMA_MODE=real
 NEXT_PUBLIC_TOKENOPS_MODE=real
+NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL=https://app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be
+NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT=0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494
 ZAMA_RELAYER_URL=...
 ```
+
+### Sepolia deployments (demo)
+
+| Component | Address / link |
+| --- | --- |
+| CloakOps `ConfidentialCampaign` | `0xe14555024f730D31aDeD9759C0570399EE4eDc78` |
+| Mock token (cDEMO, ERC-20 reference) | `0x64b18e14F1A47C4152a69Ad12e50C6B9F0c6dd2E` |
+| TokenOps x ZAMA vesting contract | `0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494` |
+| TokenOps vesting tracking | [app.tokenops.xyz/contract/schedules/6a189b…](https://app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be) |
+
+CloakOps links to the live TokenOps vesting schedule in `/public-audit` and after
+admin create-flow sync (no fake `/campaigns/tops_*` URLs).
 
 ### Deploy the frontend (Vercel)
 

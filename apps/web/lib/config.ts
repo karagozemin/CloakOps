@@ -67,3 +67,28 @@ export const isContractConfigured = Boolean(CLOAKOPS_CONTRACT_ADDRESS);
 
 export const hasLiveContractAddressNote =
   "Not configured (set NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS after deploy)";
+
+/** TokenOps x ZAMA vesting schedule deployed on Sepolia (tracking page + contract). */
+export const TOKENOPS_VESTING_SCHEDULE_ID =
+  process.env.NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_ID ??
+  "6a189b396f763543bff332be";
+
+export const TOKENOPS_VESTING_CONTRACT = (process.env
+  .NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT ??
+  "0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494") as `0x${string}`;
+
+export const TOKENOPS_VESTING_SCHEDULE_URL =
+  process.env.NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL ??
+  `https://app.tokenops.xyz/contract/schedules/${TOKENOPS_VESTING_SCHEDULE_ID}`;
+
+/** Live TokenOps vesting rail link when schedule id is configured. */
+export function tokenOpsVestingLink():
+  | { id: string; url: string; contract: `0x${string}` }
+  | undefined {
+  if (!TOKENOPS_VESTING_SCHEDULE_ID) return undefined;
+  return {
+    id: TOKENOPS_VESTING_SCHEDULE_ID,
+    url: TOKENOPS_VESTING_SCHEDULE_URL,
+    contract: TOKENOPS_VESTING_CONTRACT,
+  };
+}

@@ -1,3 +1,4 @@
+import { tokenOpsVestingLink } from "@/lib/config";
 import type { Address, PublicClient, WalletClient } from "viem";
 import type {
   CreateDistributionOperationInput,
@@ -161,11 +162,13 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       meta: { txHash, airdrop },
     });
 
+    const vesting = tokenOpsVestingLink();
     return {
-      tokenOpsCampaignId: airdrop,
+      tokenOpsCampaignId: vesting?.id ?? airdrop,
       status: "pending",
       createdAt: Date.now(),
       txHash,
+      url: vesting?.url,
     };
   }
 

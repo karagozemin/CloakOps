@@ -211,7 +211,7 @@ export default function PublicAuditPage() {
                 <span className="text-cloak-muted">{hasLiveContractAddressNote}</span>
               )}
             </Row>
-            <Row label="TokenOps campaign">
+            <Row label="TokenOps vesting">
               {campaign.tokenOpsUrl ? (
                 <a
                   href={campaign.tokenOpsUrl}

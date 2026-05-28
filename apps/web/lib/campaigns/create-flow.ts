@@ -1,7 +1,7 @@
 import type { Address, PublicClient, WalletClient } from "viem";
 import type { ParsedRecipient } from "@/lib/csv/parse";
 import type { ZamaProvider } from "@/lib/zama/types";
-import { ZAMA_MODE } from "@/lib/config";
+import { ZAMA_MODE, tokenOpsVestingLink } from "@/lib/config";
 import { hasLiveContract } from "@/lib/contracts";
 import {
   batchAddRecipientsOnChain,
@@ -247,8 +247,9 @@ export async function runCreateCampaign(
     })),
     createdAt: Date.now(),
     txHash,
-    tokenOpsCampaignId: tokenOpsResult.tokenOpsCampaignId,
-    tokenOpsUrl: tokenOpsResult.url,
+    tokenOpsCampaignId:
+      tokenOpsResult.tokenOpsCampaignId ?? tokenOpsVestingLink()?.id,
+    tokenOpsUrl: tokenOpsResult.url ?? tokenOpsVestingLink()?.url,
     notes: input.notes,
     source,
   };

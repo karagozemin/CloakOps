@@ -1,3 +1,4 @@
+import { tokenOpsVestingLink } from "@/lib/config";
 import { sleep } from "@/lib/utils";
 import type {
   CreateDistributionOperationInput,
@@ -71,18 +72,21 @@ export class DemoTokenOpsAdapter implements TokenOpsCampaignAdapter {
       message: `Creating TokenOps campaign "${input.name}"…`,
     });
     await sleep(700);
-    const id = `tops_${Math.random().toString(36).slice(2, 10)}`;
+    const vesting = tokenOpsVestingLink();
+    const id = vesting?.id ?? `vesting_${Math.random().toString(36).slice(2, 10)}`;
     this.log({
       level: "success",
       op: "createCampaign",
-      message: `TokenOps campaign created (${id}).`,
+      message: vesting
+        ? `Linked to TokenOps vesting schedule (${id}).`
+        : `TokenOps vesting sync recorded (${id}).`,
       meta: { recipients: input.recipientCount, budget: input.totalBudget },
     });
     return {
       tokenOpsCampaignId: id,
       status: "created",
       createdAt: Date.now(),
-      url: `https://app.tokenops.xyz/campaigns/${id}`,
+      url: vesting?.url,
     };
   }
 
