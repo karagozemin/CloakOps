@@ -4,14 +4,19 @@ import { cn } from "@/lib/utils";
 
 const LOGO_SRC = "/brand/cloakops-logo.png";
 
-type LogoSize = "xs" | "sm" | "md" | "lg" | "xl";
+type LogoSize = "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
 
 const sizeMap: Record<LogoSize, { height: number; width: number; className: string }> = {
   xs: { height: 28, width: 28, className: "h-7 w-7" },
   sm: { height: 36, width: 36, className: "h-9 w-9" },
-  md: { height: 44, width: 44, className: "h-11 w-11" },
-  lg: { height: 72, width: 72, className: "h-[4.5rem] w-[4.5rem]" },
-  xl: { height: 112, width: 112, className: "h-28 w-28" },
+  md: { height: 48, width: 48, className: "h-12 w-12" },
+  lg: { height: 64, width: 64, className: "h-16 w-16" },
+  xl: { height: 144, width: 144, className: "h-36 w-36" },
+  "2xl": {
+    height: 192,
+    width: 192,
+    className: "h-48 w-48 sm:h-56 sm:w-56",
+  },
 };
 
 export function Logo({
