@@ -68,12 +68,13 @@ Full detail: [`docs/privacy-model.md`](docs/privacy-model.md).
 
 ```
 apps/web                 Next.js App Router frontend (TS + Tailwind + wagmi/viem)
-  app/                   landing, /admin, /claim, /public-audit/[id], /campaign/[id], /api/relayer/[chainId]
-  lib/zama               dual-mode FHE: DemoZamaProvider + RealZamaProvider (Relayer SDK)
-  lib/tokenops           TokenOps adapter: DemoTokenOpsAdapter + RealTokenOpsAdapter (@tokenops/sdk), op-log
-  lib/campaigns          local campaign store, create-flow orchestrator, hooks
-  lib/csv, lib/demo      CSV parse/validate + the "AI x Crypto Seed Contributors" dataset
-  lib/contracts          generated ABI + typed bindings (exported from the contracts package)
+  app/                   landing, /admin, /claim, /public-audit, /public-audit/[id], /campaign/[id], /api/relayer/[chainId]
+  lib/zama               RealZamaProvider — Zama Relayer SDK encrypt/decrypt
+  lib/tokenops           RealTokenOpsAdapter (@tokenops/sdk) + op-log store
+  lib/campaigns          local campaign cache, create-flow orchestrator, hooks
+  lib/csv, lib/sample    CSV parse/validate + the "AI x Crypto Seed Contributors" sample dataset
+  lib/contracts          generated ABI + typed bindings + on-chain read/write helpers
+  lib/wagmi              wallet/public client resolution for on-chain signing
 packages/contracts       Hardhat + @fhevm/solidity
   contracts/             ConfidentialCampaign.sol, MockConfidentialToken.sol
   test/                  FHEVM mock-mode tests
@@ -85,16 +86,20 @@ More: [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
-## Dual-mode design (the demo never breaks)
+## Real, on-chain by design
 
-Both the FHE layer and the TokenOps layer run in **demo** or **real** mode:
+CloakOps runs against live infrastructure end to end — there is no simulated
+fallback:
 
-- **Demo (default)** — deterministic local FHE simulation + a faithful TokenOps
-  lifecycle simulation. No deployed contract, relayer, API keys, or testnet
-  funds required. The full product flow always works.
-- **Real** — the Zama Relayer SDK encrypts/decrypts against the deployed
-  `ConfidentialCampaign` contract; the `@tokenops/sdk` confidential-airdrop
-  rails handle the TokenOps side. Enabled via env vars once deployed.
+- **Zama FHE** — the Zama Relayer SDK encrypts allocations client-side and
+  performs user-decryption against the deployed `ConfidentialCampaign` contract
+  on Sepolia. Only the recipient wallet can decrypt its own values.
+- **TokenOps** — the `@tokenops/sdk` confidential-distribution rails link each
+  campaign to a live TokenOps vesting schedule, with connection status and an
+  operation log surfaced in the UI.
+
+All writes (create campaign, add recipients, claim) are signed by the connected
+wallet and settled on Sepolia.
 
 ---
 
@@ -104,6 +109,7 @@ Both the FHE layer and the TokenOps layer run in **demo** or **real** mode:
 
 - Node.js >= 20
 - npm >= 9
+- A wallet (MetaMask) on **Sepolia** with test ETH
 
 ### Install
 
@@ -111,7 +117,7 @@ Both the FHE layer and the TokenOps layer run in **demo** or **real** mode:
 npm install
 ```
 
-### Run the web app (demo mode, no setup needed)
+### Run the web app
 
 ```bash
 npm run dev
@@ -120,11 +126,15 @@ npm run dev
 
 Try it:
 
-1. **/admin** → *Load Demo CSV* → *Create confidential campaign* and watch the
-   5-step flow (parse → Zama encrypt → contract submit → TokenOps sync → ready).
-2. **/claim** → connect a wallet → *Add my wallet to demo campaign* → decrypt
-   your allocation/tier/vesting and claim.
-3. **/public-audit/1** → verify public rules while private fields stay locked.
+1. **/admin** → connect your wallet on Sepolia → add recipients with the form
+   (or paste/upload a CSV) → *Create confidential campaign* and watch the 5-step
+   flow (parse → Zama encrypt → contract submit → TokenOps sync → ready). Each
+   on-chain step prompts a wallet signature.
+2. **/claim** → connect a recipient wallet → the page auto-scans the contract
+   for campaigns where the wallet is eligible → decrypt your
+   allocation/tier/vesting and claim.
+3. **/public-audit** → browse all campaigns and open one to verify public rules
+   while private fields stay encrypted.
 
 ### Contracts: compile & test
 
@@ -142,15 +152,14 @@ npm run export-abi          # syncs ABI + address into apps/web/lib/contracts
 npm run demo-campaign       # (optional) seeds the encrypted demo campaign on-chain
 ```
 
-Then set the frontend env and enable real mode:
+Then set the frontend env (`apps/web/.env.local`):
 
 ```env
 NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS=0x...
-NEXT_PUBLIC_ZAMA_MODE=real
-NEXT_PUBLIC_TOKENOPS_MODE=real
 NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL=https://app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be
 NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT=0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494
-ZAMA_RELAYER_URL=...
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
+ZAMA_RELAYER_URL=https://relayer.testnet.zama.org/v2
 ```
 
 ### Sepolia deployments (demo)
@@ -201,9 +210,9 @@ confidential ERC-7984 transfer via TokenOps is the documented roadmap item.
 - **MVP scope**: the contract is the confidential campaign + claim layer and
   does not custody/transfer real tokens. Recipient addresses, tx timing, and the
   admin address are visible (see privacy model).
-- **Real-mode frontend** (on-chain writes + relayer encrypt/decrypt) is wired
-  and gated behind a deployed contract; demo mode is the default so the
-  experience always runs.
+- **On-chain by default**: all encrypt/decrypt and writes run against the
+  deployed contract + Zama relayer on Sepolia; a connected wallet on Sepolia is
+  required.
 - **Roadmap**: confidential ERC-7984 claim transfers via TokenOps rails,
   encrypted vesting schedule enforcement on-chain, multi-admin campaigns,
   on-chain campaign indexing.
