@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/admin", label: "Admin" },
   { href: "/claim", label: "Claim" },
-  { href: "/public-audit/1", label: "Public Audit" },
+  { href: "/public-audit", label: "Public Audit" },
 ];
 
 export function SiteHeader() {

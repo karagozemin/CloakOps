@@ -9,6 +9,7 @@ import { PageHeader, EmptyState } from "@/components/ui/empty";
 import { StepIndicator, type StepStatus } from "@/components/ui/step-indicator";
 import { TokenOpsPanel } from "@/components/tokenops/tokenops-panel";
 import { CsvEditor } from "@/components/admin/csv-editor";
+import { RecipientBuilder } from "@/components/admin/recipient-builder";
 import { useZama } from "@/lib/zama";
 import { useTokenOps } from "@/lib/tokenops/context";
 import { parseAllocationCsv, type CsvParseResult } from "@/lib/csv/parse";
@@ -61,6 +62,7 @@ export default function AdminPage() {
   const [claimEnd, setClaimEnd] = useState(defaultLocalDateTime(60));
   const [notes, setNotes] = useState("");
   const [csvText, setCsvText] = useState("");
+  const [recipientMode, setRecipientMode] = useState<"form" | "csv">("form");
 
   const [statuses, setStatuses] = useState<Record<string, StepStatus>>({});
   const [stepDetails, setStepDetails] = useState<Record<string, string>>({});
@@ -281,11 +283,37 @@ export default function AdminPage() {
 
           <Card>
             <CardHeader
-              title="Recipient allocations (CSV)"
-              subtitle="wallet, allocation, tier, vestingClass, role"
+              title="Recipient allocations"
+              subtitle="Add recipients with the form, or paste a CSV"
               icon={<FileUp className="h-4 w-4" />}
               action={
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-lg border border-cloak-line bg-ink-900 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setRecipientMode("form")}
+                      className={cn(
+                        "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                        recipientMode === "form"
+                          ? "bg-gold/15 text-gold"
+                          : "text-cloak-muted hover:text-cloak-fg",
+                      )}
+                    >
+                      Form
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecipientMode("csv")}
+                      className={cn(
+                        "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                        recipientMode === "csv"
+                          ? "bg-gold/15 text-gold"
+                          : "text-cloak-muted hover:text-cloak-fg",
+                      )}
+                    >
+                      CSV
+                    </button>
+                  </div>
                   <button
                     className="btn-subtle"
                     onClick={() => fileRef.current?.click()}
@@ -304,21 +332,56 @@ export default function AdminPage() {
               }
             />
             <CardBody className="space-y-4">
-              <CsvEditor
-                value={csvText}
-                onChange={setCsvText}
-                validCount={parseResult?.recipients.length ?? 0}
-                errorCount={parseResult?.errors.length ?? 0}
-              />
-
-              {parseResult ? (
-                <RecipientsPreview result={parseResult} budget={budgetNum} />
+              {recipientMode === "form" ? (
+                <>
+                  <RecipientBuilder
+                    recipients={parseResult?.recipients ?? []}
+                    onChange={setCsvText}
+                  />
+                  {parseResult && parseResult.errors.length > 0 ? (
+                    <div className="rounded-lg border border-cloak-danger/30 bg-cloak-danger/10 p-3">
+                      <p className="text-xs font-medium text-cloak-danger">
+                        {parseResult.errors.length} row(s) from CSV could not be
+                        parsed. Switch to CSV mode to fix them.
+                      </p>
+                    </div>
+                  ) : null}
+                  {budgetNum > 0 && parseResult ? (
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span
+                        className={cn(
+                          "chip",
+                          overBudget &&
+                            "border-cloak-danger/40 text-cloak-danger",
+                        )}
+                      >
+                        Σ allocations:{" "}
+                        {formatNumber(parseResult.totalAllocation)}
+                      </span>
+                      <span className="chip">
+                        budget: {formatNumber(budgetNum)}
+                      </span>
+                    </div>
+                  ) : null}
+                </>
               ) : (
-                <EmptyState
-                  icon={<EyeOff className="h-6 w-6" />}
-                  title="No recipients yet"
-                  description="Paste a CSV or click Load sample CSV to preview parsed allocations."
-                />
+                <>
+                  <CsvEditor
+                    value={csvText}
+                    onChange={setCsvText}
+                    validCount={parseResult?.recipients.length ?? 0}
+                    errorCount={parseResult?.errors.length ?? 0}
+                  />
+                  {parseResult ? (
+                    <RecipientsPreview result={parseResult} budget={budgetNum} />
+                  ) : (
+                    <EmptyState
+                      icon={<EyeOff className="h-6 w-6" />}
+                      title="No recipients yet"
+                      description="Paste a CSV or click Load sample CSV to preview parsed allocations."
+                    />
+                  )}
+                </>
               )}
             </CardBody>
           </Card>

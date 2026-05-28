@@ -17,7 +17,7 @@ export function SiteFooter() {
             <span className="text-cloak-faint">·</span>
             <span>TokenOps Special Bounty</span>
             <span className="text-cloak-faint">·</span>
-            <Link href="/public-audit/1" className="hover:text-gold">
+            <Link href="/public-audit" className="hover:text-gold">
               Public Audit
             </Link>
           </div>
