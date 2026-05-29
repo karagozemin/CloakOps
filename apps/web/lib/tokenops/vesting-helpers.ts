@@ -1,10 +1,88 @@
 import type { Address, Hex, PublicClient, WalletClient } from "viem";
-import { keccak256, toBytes } from "viem";
+import { encodeAbiParameters } from "viem";
 import { waitForTransactionReceipt } from "viem/actions";
 import { CHAIN_ID } from "@/lib/config";
 
 /** uint48 operator deadline (~year 2033). */
 export const OPERATOR_DEADLINE = 2_000_000_000;
+
+/**
+ * Minimal ABI for `TokenOpsVestingWalletCliffExecutorConfidentialFactory` —
+ * the on-chain contract the TokenOps dashboard deploys vesting wallets through.
+ */
+export const TOKENOPS_VESTING_FACTORY_ABI = [
+  {
+    type: "function",
+    name: "createVestingWalletConfidential",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "initArgs", type: "bytes" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "predictVestingWalletConfidential",
+    stateMutability: "view",
+    inputs: [{ name: "initArgs", type: "bytes" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "batchFundVestingWalletConfidential",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      {
+        name: "vestingPlans",
+        type: "tuple[]",
+        components: [
+          { name: "encryptedAmount", type: "bytes32" },
+          { name: "initArgs", type: "bytes" },
+        ],
+      },
+      { name: "inputProof", type: "bytes" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+/** ABI parameter layout for the CliffExecutor vesting wallet `initialize`. */
+const INIT_ARGS_PARAMS = [
+  { name: "beneficiary", type: "address" },
+  { name: "startTimestamp", type: "uint48" },
+  { name: "durationSeconds", type: "uint48" },
+  { name: "cliffSeconds", type: "uint48" },
+  { name: "executor", type: "address" },
+] as const;
+
+/**
+ * Encode the `initArgs` bytes consumed by createVestingWalletConfidential /
+ * batchFundVestingWalletConfidential. The salt (and therefore the wallet
+ * address) is `keccak256(initArgs)`, so the same beneficiary+schedule+executor
+ * always maps to one deterministic vesting wallet.
+ */
+export function buildVestingInitArgs(
+  beneficiary: Address,
+  claimStart: number,
+  claimEnd: number,
+  vestingClass: number,
+  executor: Address,
+): Hex {
+  const startTimestamp = claimStart;
+  const endTimestamp = Math.max(claimEnd, claimStart + 86400);
+  const durationSeconds = endTimestamp - startTimestamp;
+  const cliffSeconds =
+    vestingClass > 0
+      ? Math.min(vestingClass * 30 * 86400, Math.max(durationSeconds - 1, 0))
+      : 0;
+
+  return encodeAbiParameters(INIT_ARGS_PARAMS, [
+    beneficiary,
+    startTimestamp,
+    durationSeconds,
+    cliffSeconds,
+    executor,
+  ]);
+}
 
 export function resolveTokenOpsRelayerUrl(): string | undefined {
   const useProxy = process.env.NEXT_PUBLIC_ZAMA_USE_RELAYER_PROXY !== "false";
@@ -17,60 +95,7 @@ export function resolveTokenOpsRelayerUrl(): string | undefined {
   );
 }
 
-export function campaignManagerSalt(cloakOpsCampaignId?: string): Hex {
-  if (cloakOpsCampaignId) {
-    return keccak256(toBytes(`cloakops-vesting-${cloakOpsCampaignId}`));
-  }
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return ("0x" +
-    Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")) as Hex;
-}
-
-export interface VestingScheduleParams {
-  recipient: Address;
-  startTimestamp: number;
-  endTimestamp: number;
-  cliffSeconds: number;
-  releaseIntervalSecs: number;
-  timelockSeconds: number;
-  initialUnlockBps: number;
-  cliffAmountBps: number;
-  isRevocable: boolean;
-}
-
-/** Map CloakOps claim window + vesting class to TokenOps VestingParams. */
-export function buildVestingParams(
-  recipient: Address,
-  claimStart: number,
-  claimEnd: number,
-  vestingClass: number,
-): VestingScheduleParams {
-  const startTimestamp = claimStart;
-  const endTimestamp = Math.max(claimEnd, claimStart + 86400);
-  const duration = endTimestamp - startTimestamp;
-  const cliffSeconds =
-    vestingClass > 0
-      ? Math.min(vestingClass * 30 * 86400, Math.max(duration - 86400, 0))
-      : 0;
-  const immediate = vestingClass === 0;
-
-  return {
-    recipient,
-    startTimestamp,
-    endTimestamp,
-    cliffSeconds,
-    releaseIntervalSecs: 86400,
-    timelockSeconds: 0,
-    initialUnlockBps: immediate ? 10_000 : 0,
-    cliffAmountBps: 0,
-    isRevocable: false,
-  };
-}
-
-/** Authorise the vesting manager to pull confidential tokens from the admin wallet. */
+/** Authorise a spender (factory/manager) to pull confidential tokens from the admin wallet. */
 export async function ensureTokenOperator(
   token: Address,
   manager: Address,

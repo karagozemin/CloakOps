@@ -1,12 +1,14 @@
 import {
-  TOKENOPS_VESTING_CONTRACT,
+  TOKENOPS_VESTING_FACTORY,
   tokenOpsDashboardUrl,
+  tokenOpsVestingLink,
   tokenOpsVestingToken,
 } from "@/lib/config";
-import type { Address, PublicClient, WalletClient } from "viem";
+import type { Address, Hex, PublicClient, WalletClient } from "viem";
+import { waitForTransactionReceipt } from "viem/actions";
 import {
-  buildVestingParams,
-  campaignManagerSalt,
+  TOKENOPS_VESTING_FACTORY_ABI,
+  buildVestingInitArgs,
   ensureTokenOperator,
   resolveTokenOpsRelayerUrl,
 } from "./vesting-helpers";
@@ -31,11 +33,17 @@ export interface RealTokenOpsAdapterOptions extends TokenOpsAdapterOptions {
 }
 
 /**
- * RealTokenOpsAdapter — `@tokenops/sdk/fhe-vesting` on Sepolia.
+ * RealTokenOpsAdapter — TokenOps confidential vesting factory on Sepolia.
  *
- * createCampaign  → reuse configured manager or deploy a new clone
- * syncRecipients  → setOperator + batchCreateVesting (encrypted amounts)
- * createDistributionOperation → verify on-chain recipient count
+ * This targets `TokenOpsVestingWalletCliffExecutorConfidentialFactory`, the same
+ * on-chain contract the app.tokenops.xyz dashboard deploys vesting wallets
+ * through (verified: createVestingWalletConfidential + batchFund... succeed for
+ * this account on Sepolia).
+ *
+ * createCampaign  → resolve the factory (logical campaign = factory address)
+ * syncRecipients  → setOperator + createVestingWalletConfidential (per wallet)
+ *                   + batchFundVestingWalletConfidential (one encrypted batch)
+ * createDistributionOperation → no-op summary
  */
 export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
   readonly mode = "real" as const;
@@ -55,161 +63,60 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
 
   async getStatus(): Promise<TokenOpsStatus> {
     const start = Date.now();
-    try {
-      const { getFheVestingFactoryAddress } = await import("@tokenops/sdk");
-      const factoryAddress = getFheVestingFactoryAddress(this.chainId);
-      const managerAddress = TOKENOPS_VESTING_CONTRACT || undefined;
-      const chainSupported = Boolean(factoryAddress);
+    const factoryAddress = TOKENOPS_VESTING_FACTORY || undefined;
+    const chainSupported = Boolean(factoryAddress);
 
-      const status: TokenOpsStatus = {
-        mode: "real",
-        connected: chainSupported,
-        provider: "@tokenops/sdk fhe-vesting (ERC-7984)",
-        sdkVersion: "1.x",
-        chainId: this.chainId,
-        chainSupported,
-        factoryAddress,
-        managerAddress,
-        message: chainSupported
-          ? managerAddress
-            ? `TokenOps vesting manager ${managerAddress.slice(0, 10)}… on Sepolia.`
-            : `TokenOps vesting factory resolved on chain ${this.chainId}.`
-          : `TokenOps SDK loaded, but no vesting factory is deployed on chain ${this.chainId}.`,
-        latencyMs: Date.now() - start,
-        capabilities: [
-          "createCampaign",
-          "syncRecipients",
-          "createDistributionOperation:confidential",
-        ],
-      };
-      this.log({
-        level: chainSupported ? "success" : "warn",
-        op: "status",
-        message: status.message,
-        meta: { factory: factoryAddress, manager: managerAddress },
-      });
-      return status;
-    } catch (err) {
-      const message = "Failed to load @tokenops/sdk.";
-      this.log({ level: "error", op: "status", message: errToString(err) });
-      return {
-        mode: "real",
-        connected: false,
-        provider: "@tokenops/sdk (load failed)",
-        chainId: this.chainId,
-        chainSupported: false,
-        message,
-        latencyMs: Date.now() - start,
-        capabilities: [],
-      };
-    }
-  }
-
-  /** True when `address` responds to the fhe-vesting manager interface. */
-  private async isCompatibleManager(
-    publicClient: PublicClient,
-    address: Address,
-  ): Promise<boolean> {
-    try {
-      const { createConfidentialVestingManagerClient } = await import(
-        "@tokenops/sdk/fhe-vesting"
-      );
-      const client = createConfidentialVestingManagerClient({
-        publicClient,
-        address,
-      });
-      await client.maxBatchSize();
-      return true;
-    } catch {
-      return false;
-    }
+    const status: TokenOpsStatus = {
+      mode: "real",
+      connected: chainSupported,
+      provider: "TokenOps confidential vesting factory (ERC-7984)",
+      sdkVersion: "1.x",
+      chainId: this.chainId,
+      chainSupported,
+      factoryAddress,
+      managerAddress: factoryAddress,
+      message: chainSupported
+        ? `TokenOps vesting factory ${factoryAddress!.slice(0, 10)}… on Sepolia.`
+        : `No TokenOps vesting factory configured for chain ${this.chainId}.`,
+      latencyMs: Date.now() - start,
+      capabilities: [
+        "createCampaign",
+        "syncRecipients",
+        "createDistributionOperation:confidential",
+      ],
+    };
+    this.log({
+      level: chainSupported ? "success" : "warn",
+      op: "status",
+      message: status.message,
+      meta: { factory: factoryAddress },
+    });
+    return status;
   }
 
   async createCampaign(
     input: CreateTokenOpsCampaignInput,
   ): Promise<TokenOpsCampaignResult> {
-    const publicClient = input.onChain?.publicClient ?? this.publicClient;
-    const walletClient = input.onChain?.walletClient ?? this.walletClient;
-    const account = input.onChain?.account ?? this.account;
-
-    if (!publicClient) {
+    const factory = TOKENOPS_VESTING_FACTORY;
+    if (!factory) {
       throw new TokenOpsRealModeError(
-        "Connect a wallet on Sepolia to sync with TokenOps.",
+        "No TokenOps vesting factory is configured (NEXT_PUBLIC_TOKENOPS_VESTING_FACTORY).",
       );
     }
-
-    // Only reuse the configured manager if it is a real fhe-vesting manager
-    // (the app.tokenops.xyz schedule may be a different, incompatible contract).
-    const existingManager = TOKENOPS_VESTING_CONTRACT;
-    if (existingManager && (await this.isCompatibleManager(publicClient, existingManager))) {
-      this.log({
-        level: "success",
-        op: "createCampaign",
-        message: `Reusing TokenOps vesting manager ${existingManager.slice(0, 10)}…`,
-        meta: { manager: existingManager, cloakOpsCampaignId: input.cloakOpsCampaignId },
-      });
-      return {
-        tokenOpsCampaignId: existingManager,
-        managerAddress: existingManager,
-        status: "created",
-        createdAt: Date.now(),
-        url: tokenOpsDashboardUrl(existingManager),
-      };
-    }
-
-    if (existingManager) {
-      this.log({
-        level: "warn",
-        op: "createCampaign",
-        message: `Configured manager ${existingManager.slice(0, 10)}… is not a fhe-vesting manager — deploying a fresh one.`,
-      });
-    }
-
-    if (!walletClient || !account) {
-      throw new TokenOpsRealModeError(
-        "Deploying a new TokenOps vesting manager requires a connected wallet.",
-      );
-    }
-
-    const vestingToken = (input.vestingToken ?? tokenOpsVestingToken() ?? input.token) as Address;
-
-    this.log({
-      level: "info",
-      op: "createCampaign",
-      message: `Deploying TokenOps vesting manager for "${input.name}"…`,
-    });
-
-    const { createConfidentialVestingFactoryClient } = await import(
-      "@tokenops/sdk/fhe-vesting"
-    );
-
-    const factory = createConfidentialVestingFactoryClient({
-      publicClient,
-      walletClient,
-      chainId: this.chainId,
-    });
-
-    const userSalt = campaignManagerSalt(input.cloakOpsCampaignId);
-    const { hash, manager } = await factory.createManager({
-      token: vestingToken,
-      userSalt,
-      account,
-    });
 
     this.log({
       level: "success",
       op: "createCampaign",
-      message: `Vesting manager deployed at ${manager.slice(0, 10)}…`,
-      meta: { txHash: hash, manager },
+      message: `Using TokenOps vesting factory ${factory.slice(0, 10)}…`,
+      meta: { factory, cloakOpsCampaignId: input.cloakOpsCampaignId },
     });
 
     return {
-      tokenOpsCampaignId: manager,
-      managerAddress: manager,
+      tokenOpsCampaignId: factory,
+      managerAddress: factory,
       status: "created",
       createdAt: Date.now(),
-      url: tokenOpsDashboardUrl(manager),
-      txHash: hash,
+      url: tokenOpsDashboardUrl(factory) ?? tokenOpsVestingLink()?.url,
     };
   }
 
@@ -233,136 +140,144 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       };
     }
 
-    const manager = input.tokenOpsCampaignId as Address;
+    const factory = (input.tokenOpsCampaignId as Address) || TOKENOPS_VESTING_FACTORY;
     const token = (input.token ?? tokenOpsVestingToken()) as Address;
 
+    // 1. Authorise the factory to pull confidential tokens from the funder.
     this.log({
       level: "info",
       op: "syncRecipients",
-      message: `Authorising TokenOps manager to spend confidential tokens…`,
+      message: "Authorising TokenOps factory to spend confidential tokens…",
     });
-
     const operatorHash = await ensureTokenOperator(
       token,
-      manager,
+      factory,
       walletClient,
       publicClient,
       account,
     );
-
     this.log({
       level: "success",
       op: "syncRecipients",
       message: `Operator approved (tx ${operatorHash.slice(0, 10)}…).`,
     });
 
-    const { createSepoliaEncryptorWeb } = await import("@tokenops/sdk/fhe");
-    const { createConfidentialVestingManagerClient } = await import(
-      "@tokenops/sdk/fhe-vesting"
-    );
-
-    const relayerUrl = resolveTokenOpsRelayerUrl();
-    const encryptor = await createSepoliaEncryptorWeb({
-      publicClient,
-      walletClient,
-      relayerUrl,
-      chainId: this.chainId,
-    });
-
-    const vestingClient = createConfidentialVestingManagerClient({
-      publicClient,
-      walletClient,
-      address: manager,
-      encryptor,
-    });
-
-    const items = input.recipients.map((r) => ({
-      params: buildVestingParams(
+    // 2. Build deterministic initArgs per stakeholder (executor = funder).
+    const plans = input.recipients.map((r) => ({
+      wallet: r.wallet as Address,
+      allocation: BigInt(r.allocation),
+      initArgs: buildVestingInitArgs(
         r.wallet as Address,
         input.claimStart,
         input.claimEnd,
         r.vestingClass,
+        account,
       ),
-      amount: BigInt(r.allocation),
     }));
 
-    let maxBatch = 1;
-    try {
-      maxBatch = Number(await vestingClient.maxBatchSize());
-    } catch {
-      // Older managers may not expose maxBatchSize — fall back to 1 per tx.
-      maxBatch = 1;
-    }
-    const batchSize = Math.max(maxBatch, 1);
-    let synced = 0;
+    // 3. Deploy the vesting wallet clone for each plan (idempotent — skip if
+    //    the deterministic address already has bytecode).
+    for (const plan of plans) {
+      const predicted = (await publicClient.readContract({
+        address: factory,
+        abi: TOKENOPS_VESTING_FACTORY_ABI,
+        functionName: "predictVestingWalletConfidential",
+        args: [plan.initArgs],
+      })) as Address;
 
-    for (let i = 0; i < items.length; i += batchSize) {
-      const chunk = items.slice(i, i + batchSize);
+      const existing = await publicClient.getBytecode({ address: predicted });
+      if (existing && existing !== "0x") {
+        this.log({
+          level: "info",
+          op: "syncRecipients",
+          message: `Vesting wallet ${predicted.slice(0, 10)}… already deployed — reusing.`,
+        });
+        continue;
+      }
+
       this.log({
         level: "info",
         op: "syncRecipients",
-        message: `Creating ${chunk.length} confidential vesting schedule(s) on TokenOps…`,
-        meta: { batch: Math.floor(i / batchSize) + 1 },
+        message: `Deploying vesting wallet for ${plan.wallet.slice(0, 10)}…`,
       });
-
-      const hash = await vestingClient.batchCreateVesting({
-        items: chunk,
-        encryptor,
+      const createHash = await walletClient.writeContract({
+        address: factory,
+        abi: TOKENOPS_VESTING_FACTORY_ABI,
+        functionName: "createVestingWalletConfidential",
+        args: [plan.initArgs],
         account,
+        chain: walletClient.chain,
       });
-
-      synced += chunk.length;
-      this.log({
-        level: "success",
-        op: "syncRecipients",
-        message: `Batch ${Math.floor(i / batchSize) + 1} confirmed (${hash.slice(0, 10)}…).`,
-        meta: { synced, total: items.length },
-      });
+      await waitForTransactionReceipt(publicClient, { hash: createHash });
     }
+
+    // 4. Encrypt every allocation bound to the factory + funder (single proof).
+    const { createSepoliaEncryptorWeb } = await import("@tokenops/sdk/fhe");
+    const { encryptUint64Batch } = await import("@tokenops/sdk/fhe-vesting");
+
+    const encryptor = await createSepoliaEncryptorWeb({
+      publicClient,
+      walletClient,
+      relayerUrl: resolveTokenOpsRelayerUrl(),
+      chainId: this.chainId,
+    });
+
+    this.log({
+      level: "info",
+      op: "syncRecipients",
+      message: `Encrypting ${plans.length} confidential allocation(s)…`,
+    });
+    const { handles, inputProof } = await encryptUint64Batch({
+      encryptor,
+      contractAddress: factory,
+      userAddress: account,
+      values: plans.map((p) => p.allocation),
+    });
+
+    // 5. Fund all vesting wallets in one confidential batch transfer.
+    const vestingPlans = plans.map((p, i) => ({
+      encryptedAmount: handles[i] as Hex,
+      initArgs: p.initArgs,
+    }));
+
+    this.log({
+      level: "info",
+      op: "syncRecipients",
+      message: `Funding ${plans.length} confidential vesting wallet(s)…`,
+    });
+    const fundHash = await walletClient.writeContract({
+      address: factory,
+      abi: TOKENOPS_VESTING_FACTORY_ABI,
+      functionName: "batchFundVestingWalletConfidential",
+      args: [token, vestingPlans, inputProof as Hex],
+      account,
+      chain: walletClient.chain,
+    });
+    await waitForTransactionReceipt(publicClient, { hash: fundHash });
+
+    this.log({
+      level: "success",
+      op: "syncRecipients",
+      message: `Funded ${plans.length} stakeholder(s) (tx ${fundHash.slice(0, 10)}…).`,
+      meta: { synced: plans.length, txHash: fundHash },
+    });
 
     return {
       tokenOpsCampaignId: input.tokenOpsCampaignId,
-      synced,
-      status: synced === input.recipients.length ? "synced" : "partial",
+      synced: plans.length,
+      status: "synced",
     };
   }
 
   async createDistributionOperation(
     input: CreateDistributionOperationInput,
   ): Promise<DistributionOperationResult> {
-    const publicClient = this.publicClient;
-    if (!publicClient) {
-      return {
-        operationId: input.tokenOpsCampaignId,
-        status: "ready",
-        rail: input.rail,
-      };
-    }
-
-    try {
-      const { createConfidentialVestingManagerClient } = await import(
-        "@tokenops/sdk/fhe-vesting"
-      );
-      const manager = createConfidentialVestingManagerClient({
-        publicClient,
-        address: input.tokenOpsCampaignId as Address,
-      });
-      const count = Number(await manager.getAllRecipientsLength());
-
-      this.log({
-        level: "success",
-        op: "distribution",
-        message: `TokenOps vesting manager holds ${count} stakeholder(s).`,
-        meta: { recipients: count },
-      });
-    } catch (err) {
-      this.log({
-        level: "warn",
-        op: "distribution",
-        message: errToString(err),
-      });
-    }
-
+    this.log({
+      level: "success",
+      op: "distribution",
+      message: `TokenOps confidential vesting ready for ${input.recipientCount} stakeholder(s).`,
+      meta: { recipients: input.recipientCount },
+    });
     return {
       operationId: input.tokenOpsCampaignId,
       status: "ready",
@@ -371,31 +286,7 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
   }
 
   async getAnalytics(campaignId: string): Promise<TokenOpsAnalytics> {
-    const publicClient = this.publicClient;
-    if (!publicClient) {
-      return emptyAnalytics(campaignId);
-    }
-
-    try {
-      const { createConfidentialVestingManagerClient } = await import(
-        "@tokenops/sdk/fhe-vesting"
-      );
-      const manager = createConfidentialVestingManagerClient({
-        publicClient,
-        address: campaignId as Address,
-      });
-      const recipients = Number(await manager.getAllRecipientsLength());
-
-      return {
-        tokenOpsCampaignId: campaignId,
-        recipients,
-        claimed: 0,
-        pending: recipients,
-        totalBudget: "0",
-      };
-    } catch {
-      return emptyAnalytics(campaignId);
-    }
+    return emptyAnalytics(campaignId);
   }
 }
 
@@ -414,9 +305,4 @@ function emptyAnalytics(campaignId: string): TokenOpsAnalytics {
     pending: 0,
     totalBudget: "0",
   };
-}
-
-function errToString(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return String(err);
 }

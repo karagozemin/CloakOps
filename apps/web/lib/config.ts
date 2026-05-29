@@ -99,6 +99,17 @@ export const TOKENOPS_VESTING_CONTRACT =
   ("" as `0x${string}`);
 
 /**
+ * TokenOps confidential vesting factory
+ * (`TokenOpsVestingWalletCliffExecutorConfidentialFactory`) on Sepolia — the
+ * same contract the app.tokenops.xyz dashboard deploys vesting wallets through.
+ * createVestingWalletConfidential + batchFundVestingWalletConfidential live here.
+ */
+export const TOKENOPS_VESTING_FACTORY =
+  envAddress(process.env.NEXT_PUBLIC_TOKENOPS_VESTING_FACTORY) ||
+  envAddress("0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a") ||
+  ("" as `0x${string}`);
+
+/**
  * ERC-7984 token the configured vesting manager accepts.
  * Must match the manager's immutable token (e.g. CTestToken on the linked schedule).
  */

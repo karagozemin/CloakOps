@@ -170,13 +170,13 @@ export async function runCreateCampaign(
     throw err;
   }
 
-  // TokenOps sync is best-effort: the CloakOps on-chain campaign (above) is the
-  // canonical source of truth. A TokenOps revert (e.g. the connected wallet
-  // lacks a confidential balance of the vesting token) must NOT discard a
-  // campaign that is already live on Sepolia.
-  let tokenOpsResult: TokenOpsCampaignResult | undefined;
+  // TokenOps confidential vesting: deploy + fund a vesting wallet per stakeholder
+  // on TokenOps' on-chain factory. This is the canonical "real integration" step,
+  // so a revert here is fatal — the campaign creator must hold a confidential
+  // balance of the vesting token (the factory pulls it via confidentialTransferFrom).
+  let tokenOpsResult: TokenOpsCampaignResult;
   try {
-    onStep("tokenops", "active", "Connecting to TokenOps vesting manager…");
+    onStep("tokenops", "active", "Connecting to TokenOps vesting factory…");
     tokenOpsResult = await tokenops.createCampaign({
       name: input.name,
       campaignType: input.campaignType,
@@ -194,7 +194,7 @@ export async function runCreateCampaign(
     onStep(
       "tokenops",
       "active",
-      "Approve TokenOps operator, then confirm vesting schedules in your wallet…",
+      "Approve TokenOps operator, then confirm confidential vesting funding in your wallet…",
     );
     await tokenops.syncRecipients({
       tokenOpsCampaignId: tokenOpsResult.tokenOpsCampaignId,
@@ -214,14 +214,10 @@ export async function runCreateCampaign(
       rail: "confidential",
       recipientCount: recipients.length,
     });
-    onStep("tokenops", "done", "Stakeholders synced to TokenOps vesting.");
+    onStep("tokenops", "done", "Stakeholders funded on TokenOps confidential vesting.");
   } catch (err) {
-    // Non-fatal: keep the campaign, surface the reason on the step.
-    onStep(
-      "tokenops",
-      "done",
-      `Campaign saved; TokenOps vesting sync skipped: ${errMsg(err)}`,
-    );
+    onStep("tokenops", "error", errMsg(err));
+    throw err;
   }
 
   onStep("ready", "active");
@@ -244,10 +240,10 @@ export async function runCreateCampaign(
     createdAt: Date.now(),
     txHash,
     tokenOpsCampaignId:
-      tokenOpsResult?.tokenOpsCampaignId ??
-      tokenOpsResult?.managerAddress ??
+      tokenOpsResult.tokenOpsCampaignId ??
+      tokenOpsResult.managerAddress ??
       tokenOpsVestingLink()?.id,
-    tokenOpsUrl: tokenOpsResult?.url ?? tokenOpsVestingLink()?.url,
+    tokenOpsUrl: tokenOpsResult.url ?? tokenOpsVestingLink()?.url,
     notes: input.notes,
     source: "onchain",
   };
