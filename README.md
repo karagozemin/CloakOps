@@ -37,6 +37,23 @@ payout amount is never revealed publicly.
 TokenOps provides the **campaign and distribution lifecycle rail**; CloakOps
 adds the **confidential metadata layer**.
 
+### How the two settlement rails relate
+
+CloakOps drives **two complementary, confidential settlement paths from the same
+encrypted allocation** — neither ever reveals the amount publicly:
+
+| | CloakOps confidential claim | TokenOps confidential vesting |
+| --- | --- | --- |
+| Contract | `CloakConfidentialToken` (`FHE.add`) | TokenOps `…CliffExecutorConfidentialFactory` |
+| Trigger | Recipient calls `claim()` | Admin runs the create flow |
+| Effect | Credits recipient's encrypted balance instantly | Deploys + funds a per-recipient vesting wallet that releases on a schedule |
+| Amount privacy | `euint64`, recipient-decryptable only | `euint64` encrypted in-browser before funding |
+
+The encrypted allocation in `ConfidentialCampaign.sol` is the **single source of
+truth**; the claim rail proves the FHE payout primitive end-to-end, while the
+TokenOps rail proves the same encrypted amount can drive real, schedule-based
+vesting wallets. On-chain proof: [`docs/tokenops-integration.md`](docs/tokenops-integration.md#verifiable-on-chain-proof).
+
 ---
 
 ## Why both tracks

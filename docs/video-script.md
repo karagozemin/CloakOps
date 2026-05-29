@@ -41,12 +41,19 @@ allocation, tier, and vesting value.)
 
 > "Step by step: the CSV is validated, the allocations are encrypted with Zama
 > FHE, the confidential contract is submitted, and — this is the TokenOps part —
-> the campaign lifecycle is synced to TokenOps: it creates the campaign, syncs
-> the recipients, and prepares a confidential distribution operation. You can
-> see the live TokenOps connection status and the operation log right here in
-> the product."
+> we write directly to the same confidential vesting factory the TokenOps
+> dashboard uses: it deploys a vesting wallet per stakeholder and funds each one
+> with the browser-encrypted amount, batched so the signature count stays fixed."
 
 (Point to the TokenOps panel: mode, connection, operation log entries.)
+
+> "And this is real, not a mock — I'll click the TokenOps vesting link, which
+> opens the actual funding transaction on Etherscan. You can see one
+> `VestingWalletConfidentialFunded` event per stakeholder — real wallets,
+> deployed and funded with encrypted amounts."
+
+(Click the campaign's **TokenOps vesting** link → Etherscan tx → highlight the
+`VestingWalletConfidentialFunded` events on the factory.)
 
 ## 1:35 – 2:15 — Recipient claim (screen recording)
 
@@ -88,6 +95,7 @@ recipients ledger with addresses visible but amounts locked.)
 ### Shot list / b-roll
 - Block explorer with visible transfer amounts (problem).
 - Admin: Load Demo CSV → locks → 5-step flow → TokenOps log.
+- Etherscan: funding tx with one `VestingWalletConfidentialFunded` per stakeholder.
 - Claim: connect → decrypt three fields → claim.
 - Public audit: public vs encrypted split, recipients ledger.
 

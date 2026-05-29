@@ -156,14 +156,36 @@ chain — the plaintext allocation never lands in public state, and the CloakOps
 addresses and the schedule metadata (start/end, cliff) are visible, consistent
 with the "private allocations, public rules" model.
 
+## Verifiable on-chain proof
+
+The integration is not a mock — every wallet is a real on-chain clone funded
+with a browser-encrypted `euint64` amount. A representative run on Sepolia:
+
+| Item | Address / tx |
+| --- | --- |
+| Funder (campaign creator) | `0xcE75c70859c50f108beb65845753582DE4FfC19B` |
+| Vesting factory | [`0x98c519…beb72a`](https://sepolia.etherscan.io/address/0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a) |
+| Confidential token (CTestToken) | [`0xFaac27…377EF`](https://sepolia.etherscan.io/address/0xFaac272CDE1701479932935a3567652873c377EF) |
+| `batchFundVestingWalletConfidential` tx | [`0x3de490…2cd9e`](https://sepolia.etherscan.io/tx/0x3de4905d8b5dcd3cfada7d51ddffecf54710c07fe1c6661ddc4e1bac1ef2cd9e) |
+
+That single funding tx emits four `VestingWalletConfidentialFunded` events for
+the deployed vesting wallets, e.g.
+`0x190c74e6d4e6fd42ea9bedf35ee86b0a405f9666` and
+`0xa3df1b1864ea90ad9f393e6ef7029a746df8f6ba`. The CloakOps "TokenOps vesting"
+link on each campaign points directly at this funding tx.
+
 ## Honest limitation
 
-The vesting wallets are real, deployed, and funded on-chain (verifiable on
-Etherscan via the factory's `VestingWalletConfidentialCreated` /
-`VestingWalletConfidentialFunded` events). Whether they appear under a specific
-**app.tokenops.xyz schedule page** depends on that dashboard's own indexer,
-which is outside CloakOps' control — we target the same factory + executor to
-maximise the chance, but cannot guarantee a particular dashboard view.
+The vesting wallets are real, deployed, and funded on-chain (verifiable above
+via the factory's `VestingWalletConfidentialCreated` /
+`VestingWalletConfidentialFunded` events). They do **not** automatically show up
+under a given **app.tokenops.xyz schedule page**: that view is **auth-gated and
+populated from TokenOps' own backend** (a schedule is a per-account database
+record, its stakeholder table is written through TokenOps' "Add distribution"
+UI/API — not indexed from arbitrary factory events). CloakOps writes to the same
+factory the dashboard uses, but cannot inject rows into another product's
+private backend. The canonical, trustless proof is therefore on-chain (Etherscan
+events above), which is exactly what the in-app link surfaces.
 
 ## Environment variables
 
