@@ -1,26 +1,26 @@
 # TokenOps Integration
 
-CloakOps treats **TokenOps as the campaign / distribution lifecycle rail** and
+CloakOps treats **TokenOps as the confidential vesting / distribution rail** and
 adds a **confidential allocation, tier, and vesting metadata layer with Zama
 FHE** on top. This document explains exactly where TokenOps is integrated, what
 the real integration does on-chain, what each side owns, and the honest
 limitations.
 
 The integration is **real-only** — there is no demo/simulation mode. Every
-TokenOps call goes through `@tokenops/sdk` against live Sepolia contracts.
+TokenOps write hits live Sepolia contracts.
 
 ## Where TokenOps lives in the code
 
 ```
 apps/web/lib/tokenops/
   types.ts            # Adapter interface + DTOs + operation-log types
-  real-adapter.ts     # RealTokenOpsAdapter — wraps @tokenops/sdk/fhe-vesting
-  vesting-helpers.ts  # VestingParams mapping, setOperator, salt, relayer URL
+  real-adapter.ts     # RealTokenOpsAdapter — factory create/fund + Multicall3
+  vesting-helpers.ts  # initArgs encoding, factory/Multicall3 ABIs, setOperator, mint
   index.ts            # createTokenOpsAdapter(opts) factory
   context.tsx         # React provider: status, operation log, lifecycle calls
 apps/web/components/tokenops/
   status-pill.tsx     # Header connection-status pill
-  tokenops-panel.tsx  # Status card (factory + manager) + live operation log
+  tokenops-panel.tsx  # Status card (factory) + live operation log
 ```
 
 The adapter contract (`TokenOpsCampaignAdapter`):
@@ -33,109 +33,153 @@ createDistributionOperation(input)
 getAnalytics(campaignId)
 ```
 
-## The real `@tokenops/sdk` (v1.0.0)
+## The on-chain target: TokenOps confidential vesting factory
 
-Following Zama's acquisition of TokenOps, the SDK is a **confidential token
-operations SDK** built on Zama FHE / the ERC-7984 confidential token standard.
-CloakOps uses the **confidential vesting** rail (not airdrop):
+CloakOps writes directly to the same contract the **app.tokenops.xyz dashboard**
+uses to deploy confidential vesting wallets on Sepolia:
 
-- `@tokenops/sdk` — core: `getFheVestingFactoryAddress(chainId)`,
-  `getFheAirdropFactoryAddress(chainId)`, `SUPPORTED_CHAINS`, typed errors.
-- `@tokenops/sdk/fhe-vesting` — `createConfidentialVestingFactoryClient(...)`
-  (`createManager(...)`) and `createConfidentialVestingManagerClient(...)`
-  (`createVesting`, `batchCreateVesting`, `claim`, `getAllRecipientsLength`,
-  `maxBatchSize`, …). Also exports `erc7984OperatorAbi` for `setOperator`.
-- `@tokenops/sdk/fhe` — `createSepoliaEncryptorWeb(...)` wraps the Zama relayer
-  to encrypt `euint64` amounts in the browser.
+`TokenOpsVestingWalletCliffExecutorConfidentialFactory`
+(`NEXT_PUBLIC_TOKENOPS_VESTING_FACTORY`, default
+`0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a`).
 
-`VestingParams` shape used per recipient:
+Relevant factory surface:
 
-```ts
-{ recipient: Address; startTimestamp: number; endTimestamp: number;
-  cliffSeconds: number; releaseIntervalSecs: number; timelockSeconds: number;
-  initialUnlockBps: number; cliffAmountBps: number; isRevocable: boolean }
+- `createVestingWalletConfidential(bytes initArgs) → address` — deploys a
+  deterministic clone (`Clones.cloneDeterministic`, salt = `keccak256(initArgs)`).
+- `predictVestingWalletConfidential(bytes initArgs) → address` — the wallet
+  address for a given `initArgs` (no deploy).
+- `batchFundVestingWalletConfidential(address token, VestingPlan[] plans, bytes inputProof)`
+  — pulls confidential tokens from the caller into each (predicted) wallet via
+  `IERC7984(token).confidentialTransferFrom(msg.sender, wallet, amount)`.
+
+`initArgs` is ABI-encoded as:
+
+```solidity
+abi.encode(
+  address beneficiary,
+  uint48  startTimestamp,
+  uint48  durationSeconds,
+  uint48  cliffSeconds,
+  address executor
+)
 ```
+
+The confidential vesting token is an **ERC-7984** test faucet
+(`TestConfidentialWrapper`) whose `mint(address,uint64)` is permissionless on
+Sepolia, so any campaign creator can fund themselves.
 
 ## What the integration does (real, on-chain)
 
-`RealTokenOpsAdapter` dynamically imports the SDK (kept out of the default
-bundle) and runs three steps, all wired into the admin create flow
-(`lib/campaigns/create-flow.ts`):
+`RealTokenOpsAdapter` runs three steps, all wired into the admin create flow
+(`lib/campaigns/create-flow.ts`). The Zama SDK pieces
+(`@tokenops/sdk/fhe`, `@tokenops/sdk/fhe-vesting`) are imported dynamically and
+used only for encryption (`createSepoliaEncryptorWeb`, `encryptUint64Batch`) and
+the `erc7984OperatorAbi`.
 
 ### 1. `getStatus`
-Resolves the on-chain confidential-**vesting** factory via
-`getFheVestingFactoryAddress(chainId)` and reports the configured manager
-(`NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT`). Genuine SDK call.
+Reports the configured factory (`NEXT_PUBLIC_TOKENOPS_VESTING_FACTORY`) and
+whether the chain is supported.
 
 ### 2. `createCampaign`
-- If `NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT` is set (default), **reuses** that
-  vesting manager clone — no redeploy tx, links to the existing
-  app.tokenops.xyz schedule.
-- Otherwise deploys a fresh manager via `factory.createManager({ token, userSalt })`
-  and reads the address from the `ManagerCreated` event. The salt is derived
-  deterministically from the CloakOps campaign id.
+Resolves the factory address — the logical "campaign" is the factory itself, so
+there is no per-campaign manager deploy.
 
-### 3. `syncRecipients` (the real stakeholder write)
-1. `setOperator(manager, deadline)` on the ERC-7984 token — authorises the
-   manager to pull the admin's confidential tokens (one wallet signature).
-2. Builds a `createSepoliaEncryptorWeb` encryptor (Zama relayer).
-3. `batchCreateVesting({ items })` — each item carries a `VestingParams` plus a
-   **plaintext `bigint` amount that the SDK encrypts** before submission.
-   Batches respect `maxBatchSize()`.
+### 3. `syncRecipients` — minimal signatures, full deploy
 
-Vesting class → schedule mapping (`vesting-helpers.ts > buildVestingParams`):
+Builds deterministic `initArgs` per stakeholder (`executor = funder`), then:
 
-| CloakOps vesting class | TokenOps schedule |
+1. **One Multicall3 tx** (`0xcA11bde05977b3631167028862bE2a173976CA11`,
+   `aggregate3`): `mint(funder, totalAllocation)` **plus** one
+   `createVestingWalletConfidential(initArgs)` per stakeholder. Both calls are
+   independent of `msg.sender`, so batching them keeps wallet **deployment** a
+   single signature regardless of stakeholder count. Create calls use
+   `allowFailure: true` so re-runs (clone already exists) stay idempotent.
+2. `setOperator(factory, deadline)` on the ERC-7984 token — **skipped** when
+   `isOperator(funder, factory)` is already true (the deadline is far future).
+3. `encryptUint64Batch({ contractAddress: factory, userAddress: funder, values })`
+   → handles + single input proof, then
+   `batchFundVestingWalletConfidential(token, plans, inputProof)` funds every
+   wallet in one confidential batch transfer.
+
+**Signature count is fixed regardless of stakeholder count:**
+
+| Scenario | TokenOps signatures |
 | --- | --- |
-| `0` | Fully unlocked at claim start (`initialUnlockBps = 10000`) |
-| `n > 0` | `n × 30 days` cliff, daily linear release to claim end |
+| First campaign (operator not yet set) | 3 — Multicall3 (mint+creates), setOperator, batchFund |
+| Later campaigns (operator cached) | 2 — Multicall3 (mint+creates), batchFund |
+
+1 stakeholder or 50 stakeholders cost the same.
+
+Vesting class → schedule mapping (`vesting-helpers.ts > buildVestingInitArgs`):
+
+| CloakOps vesting class | Cliff |
+| --- | --- |
+| `0` | No cliff (start..end linear window) |
+| `n > 0` | `n × 30 days` cliff (capped below the duration) |
 
 ### `createDistributionOperation` / `getAnalytics`
-Read-only verification — calls `getAllRecipientsLength()` on the manager so the
-operation log reflects the real on-chain stakeholder count.
+Summary only — `createDistributionOperation` logs the stakeholder count;
+`getAnalytics` returns an empty rollup (per-wallet confidential balances are not
+read back).
 
 ## Prerequisites for a successful sync (honest)
 
 `syncRecipients` will **revert** unless:
 
-1. `NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN` is the exact ERC-7984 token the manager
-   was deployed with (e.g. the CTestToken on the linked schedule).
-2. The connected admin wallet holds a **confidential balance** of that token at
-   least equal to the campaign's total allocation.
-3. The wallet is on Sepolia and signs both the `setOperator` and
-   `batchCreateVesting` transactions.
+1. `NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN` is the ERC-7984 token the factory pulls
+   (the CTestToken faucet on Sepolia).
+2. The connected wallet holds a **confidential balance** of that token at least
+   equal to the campaign's total allocation. With `NEXT_PUBLIC_TOKENOPS_AUTO_MINT`
+   enabled (default), the flow mints this balance automatically in step 1, so
+   **any** connected wallet works without pre-funding.
+3. The wallet is on Sepolia and signs the Multicall3 + (optional) setOperator +
+   batchFund transactions.
 
-If the token/funding are missing the SDK throws a typed error which surfaces in
-the TokenOps operation log — the adapter never fakes success.
+The adapter never fakes success — a revert surfaces in the TokenOps operation
+log and fails the create flow.
 
 ## Division of responsibility
 
 | Concern | Owner |
 | --- | --- |
-| Campaign lifecycle, vesting schedules, stakeholder set | **TokenOps** (`@tokenops/sdk/fhe-vesting`) |
+| Confidential vesting wallet deploy + funding | **TokenOps factory** (CliffExecutor) |
 | Confidential allocation amount / tier / vesting metadata | **CloakOps + Zama FHE** (`ConfidentialCampaign.sol`) |
+| Browser-side `euint64` encryption + relayer | **Zama** (`@tokenops/sdk/fhe`) |
 | Per-recipient decryption authorization | **Zama FHE ACL** (`FHE.allow`) |
 | Public budget, rules, claim window, claimed count | **CloakOps contract** (public state) |
 
 ## Privacy boundary at the TokenOps edge
 
-Per-recipient amounts that reach TokenOps are **encrypted by the SDK** before
-they touch the chain — the plaintext allocation never lands in TokenOps'
-public state, and the CloakOps `ConfidentialCampaign` ledger remains the
-canonical encrypted source. Recipient addresses and the public schedule
-metadata (start/end, counts) are visible, consistent with the
-"private allocations, public rules" model.
+Per-recipient amounts that reach the factory are **encrypted in the browser**
+(`encryptUint64Batch`, bound to the factory + funder) before they touch the
+chain — the plaintext allocation never lands in public state, and the CloakOps
+`ConfidentialCampaign` ledger remains the canonical encrypted source. Recipient
+addresses and the schedule metadata (start/end, cliff) are visible, consistent
+with the "private allocations, public rules" model.
+
+## Honest limitation
+
+The vesting wallets are real, deployed, and funded on-chain (verifiable on
+Etherscan via the factory's `VestingWalletConfidentialCreated` /
+`VestingWalletConfidentialFunded` events). Whether they appear under a specific
+**app.tokenops.xyz schedule page** depends on that dashboard's own indexer,
+which is outside CloakOps' control — we target the same factory + executor to
+maximise the chance, but cannot guarantee a particular dashboard view.
 
 ## Environment variables
 
 ```env
-# Reuse the manager behind your app.tokenops.xyz schedule (no redeploy tx):
-NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT=0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494
+# TokenOps confidential vesting factory (dashboard's CliffExecutor factory).
+NEXT_PUBLIC_TOKENOPS_VESTING_FACTORY=0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a
+
+# ERC-7984 token the factory pulls via confidentialTransferFrom (CTestToken faucet).
+NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN=0xFaac272CDE1701479932935a3567652873c377EF
+
+# Auto-mint the required confidential balance to the creator before funding.
+# Requires a permissionless faucet token; set "false" for non-mintable tokens.
+NEXT_PUBLIC_TOKENOPS_AUTO_MINT=true
+
+# Optional: dashboard schedule deep-link shown in the UI.
 NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_ID=6a189b396f763543bff332be
 NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL=https://app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be
-
-# REQUIRED for syncRecipients — the ERC-7984 token the manager accepts.
-# Must match the manager's immutable token, and the admin wallet must hold a
-# confidential balance of it. If empty, falls back to NEXT_PUBLIC_CLOAKOPS_TOKEN_ADDRESS.
-NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN=
 ```
