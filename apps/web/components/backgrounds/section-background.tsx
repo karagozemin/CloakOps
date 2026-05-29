@@ -20,7 +20,7 @@ export function SectionBackground({
       className={cn(
         "pointer-events-none overflow-hidden",
         variant === "viewport"
-          ? "fixed inset-0 z-0"
+          ? "fixed inset-0 z-0 h-[100dvh] w-screen"
           : fullBleed
             ? "absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2"
             : "absolute inset-0 -z-10",

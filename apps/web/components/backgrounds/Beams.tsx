@@ -5,7 +5,7 @@ import { forwardRef, useImperativeHandle, useEffect, useRef, useMemo } from 'rea
 
 import * as THREE from 'three';
 
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
 
 import './Beams.css';
@@ -57,11 +57,46 @@ const CanvasWrapper = ({ children }) => (
     frameloop="always"
     className="beams-container"
     gl={{ alpha: true, antialias: true }}
-    style={{ background: "transparent" }}
+    style={{ background: "transparent", width: "100%", height: "100%" }}
   >
     {children}
   </Canvas>
 );
+
+function BeamsScene({
+  beamWidth,
+  beamHeight,
+  beamNumber,
+  lightColor,
+  rotation,
+  beamMaterial,
+  meshRef,
+}) {
+  const { viewport } = useThree();
+  const beamSpan = beamNumber * beamWidth;
+  const scaleX = Math.max(1.35, (viewport.width / beamSpan) * 1.5);
+  const scaleY = Math.max(1.02, (viewport.height / beamHeight) * 1.06);
+
+  return (
+    <>
+      <PerspectiveCamera makeDefault position={[0, 0, 20]} fov={30} />
+      <ambientLight intensity={1} />
+      <group
+        rotation={[0, 0, THREE.MathUtils.degToRad(rotation)]}
+        scale={[scaleX, scaleY, 1]}
+      >
+        <PlaneNoise
+          ref={meshRef}
+          material={beamMaterial}
+          width={beamWidth}
+          count={beamNumber}
+          height={beamHeight}
+        />
+        <DirLight color={lightColor} position={[0, 3, 10]} />
+      </group>
+    </>
+  );
+}
 
 const hexToNormalizedRGB = hex => {
   const clean = hex.replace('#', '');
@@ -218,12 +253,15 @@ const Beams = ({
 
   return (
     <CanvasWrapper>
-      <group rotation={[0, 0, THREE.MathUtils.degToRad(rotation)]}>
-        <PlaneNoise ref={meshRef} material={beamMaterial} count={beamNumber} width={beamWidth} height={beamHeight} />
-        <DirLight color={lightColor} position={[0, 3, 10]} />
-      </group>
-      <ambientLight intensity={1} />
-      <PerspectiveCamera makeDefault position={[0, 0, 20]} fov={30} />
+      <BeamsScene
+        beamWidth={beamWidth}
+        beamHeight={beamHeight}
+        beamNumber={beamNumber}
+        lightColor={lightColor}
+        rotation={rotation}
+        beamMaterial={beamMaterial}
+        meshRef={meshRef}
+      />
     </CanvasWrapper>
   );
 };
@@ -295,7 +333,7 @@ const PlaneNoise = forwardRef((props, ref) => (
 ));
 PlaneNoise.displayName = 'PlaneNoise';
 
-const DirLight = ({ position, color }) => {
+const DirLight = ({ position, color, intensity = 1 }) => {
   const dir = useRef(null);
   useEffect(() => {
     if (!dir.current) return;
@@ -308,7 +346,7 @@ const DirLight = ({ position, color }) => {
     cam.far = 64;
     dir.current.shadow.bias = -0.004;
   }, []);
-  return <directionalLight ref={dir} color={color} intensity={1} position={position} />;
+  return <directionalLight ref={dir} color={color} intensity={intensity} position={position} />;
 };
 
 export default Beams;

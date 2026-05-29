@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { SectionBackground } from "@/components/backgrounds/section-background";
 
-const LightRays = dynamic(() => import("@/components/backgrounds/LightRays"), {
+const Beams = dynamic(() => import("@/components/backgrounds/Beams"), {
   ssr: false,
 });
 const DotGrid = dynamic(() => import("@/components/backgrounds/DotGrid"), {
@@ -19,7 +19,18 @@ export const dotGridProps = {
   speedTrigger: 100,
 };
 
-/** Full-viewport dot grid — shared by landing + app pages */
+const beamsProps = {
+  beamWidth: 2.5,
+  beamHeight: 20,
+  beamNumber: 12,
+  lightColor: "#E8B923",
+  speed: 1.5,
+  noiseIntensity: 1.0,
+  scale: 0.18,
+  rotation: 12,
+};
+
+/** App pages — subtle interactive dot grid */
 export function DotGridBackground({ opacity = 0.48 }: { opacity?: number }) {
   return (
     <SectionBackground variant="viewport" opacity={opacity}>
@@ -28,24 +39,14 @@ export function DotGridBackground({ opacity = 0.48 }: { opacity?: number }) {
   );
 }
 
-/** Landing: one continuous grid for the whole page */
+/** Landing — full-viewport Beams */
 export function LandingPageBackground() {
-  return <DotGridBackground opacity={0.48} />;
-}
-
-/** Hero spotlight — sits on top of the page-wide grid */
-export function HeroBackground() {
   return (
-    <SectionBackground opacity={0.55}>
-      <LightRays
-        raysColor="#E8B923"
-        raysOrigin="top-center"
-        lightSpread={0.85}
-        fadeDistance={1.2}
-        saturation={0.45}
-        followMouse={false}
-        rayLength={1.4}
-      />
+    <SectionBackground variant="viewport" opacity={1}>
+      <div className="absolute inset-0 bg-ink-950" aria-hidden />
+      <div className="absolute inset-0 size-full opacity-[0.46]">
+        <Beams {...beamsProps} />
+      </div>
     </SectionBackground>
   );
 }
