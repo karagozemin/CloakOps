@@ -3,6 +3,7 @@ import { Logo } from "@/components/brand/logo";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  HeroBackground,
   LandingPageBackground,
 } from "@/components/landing/landing-backgrounds";
 import {
@@ -24,7 +25,8 @@ export default function LandingPage() {
 
       <div className="relative z-10">
         {/* Hero */}
-        <section className="relative w-full py-16 sm:py-24">
+        <section className="relative w-full overflow-hidden py-16 sm:py-24">
+          <HeroBackground />
           <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
             <div className="mb-6 flex justify-center">
               <Logo size="2xl" priority className="drop-shadow-glow" />

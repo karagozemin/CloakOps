@@ -6,6 +6,9 @@ import { SectionBackground } from "@/components/backgrounds/section-background";
 const Beams = dynamic(() => import("@/components/backgrounds/Beams"), {
   ssr: false,
 });
+const LightRays = dynamic(() => import("@/components/backgrounds/LightRays"), {
+  ssr: false,
+});
 const DotGrid = dynamic(() => import("@/components/backgrounds/DotGrid"), {
   ssr: false,
 });
@@ -35,6 +38,23 @@ export function DotGridBackground({ opacity = 0.48 }: { opacity?: number }) {
   return (
     <SectionBackground variant="viewport" opacity={opacity}>
       <DotGrid {...dotGridProps} />
+    </SectionBackground>
+  );
+}
+
+/** Hero spotlight — gold rays from top-center onto the logo */
+export function HeroBackground() {
+  return (
+    <SectionBackground opacity={0.55}>
+      <LightRays
+        raysColor="#E8B923"
+        raysOrigin="top-center"
+        lightSpread={0.85}
+        fadeDistance={1.2}
+        saturation={0.45}
+        followMouse={false}
+        rayLength={1.4}
+      />
     </SectionBackground>
   );
 }
