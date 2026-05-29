@@ -102,28 +102,38 @@ export const CONFIDENTIAL_TEST_TOKEN_ABI = [
   },
 ] as const;
 
-/**
- * Mint confidential test tokens to `account` so it holds a balance the vesting
- * factory can pull when funding schedules. No-op-safe to call before funding.
- */
-export async function mintConfidentialTestTokens(
-  token: Address,
-  account: Address,
-  amount: bigint,
-  walletClient: WalletClient,
-  publicClient: PublicClient,
-): Promise<Hex> {
-  const hash = await walletClient.writeContract({
-    address: token,
-    abi: CONFIDENTIAL_TEST_TOKEN_ABI,
-    functionName: "mint",
-    args: [account, amount],
-    account,
-    chain: walletClient.chain,
-  });
-  await waitForTransactionReceipt(publicClient, { hash });
-  return hash;
-}
+/** Canonical Multicall3 (same address on every chain, incl. Sepolia). */
+export const MULTICALL3_ADDRESS =
+  "0xcA11bde05977b3631167028862bE2a173976CA11" as const;
+
+export const MULTICALL3_ABI = [
+  {
+    type: "function",
+    name: "aggregate3",
+    stateMutability: "payable",
+    inputs: [
+      {
+        name: "calls",
+        type: "tuple[]",
+        components: [
+          { name: "target", type: "address" },
+          { name: "allowFailure", type: "bool" },
+          { name: "callData", type: "bytes" },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        name: "returnData",
+        type: "tuple[]",
+        components: [
+          { name: "success", type: "bool" },
+          { name: "returnData", type: "bytes" },
+        ],
+      },
+    ],
+  },
+] as const;
 
 export function resolveTokenOpsRelayerUrl(): string | undefined {
   const useProxy = process.env.NEXT_PUBLIC_ZAMA_USE_RELAYER_PROXY !== "false";
@@ -136,15 +146,27 @@ export function resolveTokenOpsRelayerUrl(): string | undefined {
   );
 }
 
-/** Authorise a spender (factory/manager) to pull confidential tokens from the admin wallet. */
+/**
+ * Authorise a spender (factory/manager) to pull confidential tokens from the
+ * admin wallet. Skips the tx (returns null) when the operator is already set —
+ * the deadline is far in the future, so it only ever costs one signature.
+ */
 export async function ensureTokenOperator(
   token: Address,
   manager: Address,
   walletClient: WalletClient,
   publicClient: PublicClient,
   account: Address,
-): Promise<Hex> {
+): Promise<Hex | null> {
   const { erc7984OperatorAbi } = await import("@tokenops/sdk/fhe-vesting");
+
+  const alreadyOperator = await publicClient.readContract({
+    address: token,
+    abi: erc7984OperatorAbi,
+    functionName: "isOperator",
+    args: [account, manager],
+  });
+  if (alreadyOperator) return null;
 
   const hash = await walletClient.writeContract({
     address: token,

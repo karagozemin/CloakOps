@@ -6,12 +6,15 @@ import {
   tokenOpsVestingToken,
 } from "@/lib/config";
 import type { Address, Hex, PublicClient, WalletClient } from "viem";
+import { encodeFunctionData } from "viem";
 import { waitForTransactionReceipt } from "viem/actions";
 import {
+  CONFIDENTIAL_TEST_TOKEN_ABI,
+  MULTICALL3_ABI,
+  MULTICALL3_ADDRESS,
   TOKENOPS_VESTING_FACTORY_ABI,
   buildVestingInitArgs,
   ensureTokenOperator,
-  mintConfidentialTestTokens,
   resolveTokenOpsRelayerUrl,
 } from "./vesting-helpers";
 import type {
@@ -150,48 +153,7 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       0n,
     );
 
-    // 0. Mint the required confidential test-token balance to the funder so the
-    //    factory's confidentialTransferFrom always has funds to pull (faucet token).
-    if (TOKENOPS_AUTO_MINT) {
-      this.log({
-        level: "info",
-        op: "syncRecipients",
-        message: `Minting ${totalAllocation} confidential test token(s) to funder…`,
-      });
-      const mintHash = await mintConfidentialTestTokens(
-        token,
-        account,
-        totalAllocation,
-        walletClient,
-        publicClient,
-      );
-      this.log({
-        level: "success",
-        op: "syncRecipients",
-        message: `Funder balance minted (tx ${mintHash.slice(0, 10)}…).`,
-      });
-    }
-
-    // 1. Authorise the factory to pull confidential tokens from the funder.
-    this.log({
-      level: "info",
-      op: "syncRecipients",
-      message: "Authorising TokenOps factory to spend confidential tokens…",
-    });
-    const operatorHash = await ensureTokenOperator(
-      token,
-      factory,
-      walletClient,
-      publicClient,
-      account,
-    );
-    this.log({
-      level: "success",
-      op: "syncRecipients",
-      message: `Operator approved (tx ${operatorHash.slice(0, 10)}…).`,
-    });
-
-    // 2. Build deterministic initArgs per stakeholder (executor = funder).
+    // Build deterministic initArgs per stakeholder (executor = funder).
     const plans = input.recipients.map((r) => ({
       wallet: r.wallet as Address,
       allocation: BigInt(r.allocation),
@@ -204,43 +166,74 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       ),
     }));
 
-    // 3. Deploy the vesting wallet clone for each plan (idempotent — skip if
-    //    the deterministic address already has bytecode).
+    // 1. ONE signature: mint funder balance + deploy every vesting wallet clone
+    //    via Multicall3. Both mint() and createVestingWalletConfidential() are
+    //    independent of msg.sender, so batching through Multicall3 keeps this a
+    //    single tx no matter how many stakeholders there are — while still
+    //    actually deploying each clone (full functionality, not lazy).
+    const calls: { target: Address; allowFailure: boolean; callData: Hex }[] = [];
+    if (TOKENOPS_AUTO_MINT) {
+      calls.push({
+        target: token,
+        allowFailure: false,
+        callData: encodeFunctionData({
+          abi: CONFIDENTIAL_TEST_TOKEN_ABI,
+          functionName: "mint",
+          args: [account, totalAllocation],
+        }),
+      });
+    }
     for (const plan of plans) {
-      const predicted = (await publicClient.readContract({
-        address: factory,
-        abi: TOKENOPS_VESTING_FACTORY_ABI,
-        functionName: "predictVestingWalletConfidential",
-        args: [plan.initArgs],
-      })) as Address;
-
-      const existing = await publicClient.getBytecode({ address: predicted });
-      if (existing && existing !== "0x") {
-        this.log({
-          level: "info",
-          op: "syncRecipients",
-          message: `Vesting wallet ${predicted.slice(0, 10)}… already deployed — reusing.`,
-        });
-        continue;
-      }
-
-      this.log({
-        level: "info",
-        op: "syncRecipients",
-        message: `Deploying vesting wallet for ${plan.wallet.slice(0, 10)}…`,
+      calls.push({
+        // allowFailure: a clone that already exists reverts — tolerate it so
+        // re-runs are idempotent (the wallet is still funded below).
+        target: factory,
+        allowFailure: true,
+        callData: encodeFunctionData({
+          abi: TOKENOPS_VESTING_FACTORY_ABI,
+          functionName: "createVestingWalletConfidential",
+          args: [plan.initArgs],
+        }),
       });
-      const createHash = await walletClient.writeContract({
-        address: factory,
-        abi: TOKENOPS_VESTING_FACTORY_ABI,
-        functionName: "createVestingWalletConfidential",
-        args: [plan.initArgs],
-        account,
-        chain: walletClient.chain,
-      });
-      await waitForTransactionReceipt(publicClient, { hash: createHash });
     }
 
-    // 4. Encrypt every allocation bound to the factory + funder (single proof).
+    this.log({
+      level: "info",
+      op: "syncRecipients",
+      message: `Minting balance + deploying ${plans.length} vesting wallet(s) in one tx…`,
+    });
+    const setupHash = await walletClient.writeContract({
+      address: MULTICALL3_ADDRESS,
+      abi: MULTICALL3_ABI,
+      functionName: "aggregate3",
+      args: [calls],
+      account,
+      chain: walletClient.chain,
+    });
+    await waitForTransactionReceipt(publicClient, { hash: setupHash });
+    this.log({
+      level: "success",
+      op: "syncRecipients",
+      message: `Balance minted + wallets deployed (tx ${setupHash.slice(0, 10)}…).`,
+    });
+
+    // 2. Authorise the factory to pull confidential tokens (skipped if already set).
+    const operatorHash = await ensureTokenOperator(
+      token,
+      factory,
+      walletClient,
+      publicClient,
+      account,
+    );
+    this.log({
+      level: "success",
+      op: "syncRecipients",
+      message: operatorHash
+        ? `Operator approved (tx ${operatorHash.slice(0, 10)}…).`
+        : "Operator already approved — skipping.",
+    });
+
+    // 3. Encrypt every allocation bound to the factory + funder (single proof).
     const { createSepoliaEncryptorWeb } = await import("@tokenops/sdk/fhe");
     const { encryptUint64Batch } = await import("@tokenops/sdk/fhe-vesting");
 
@@ -263,7 +256,7 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       values: plans.map((p) => p.allocation),
     });
 
-    // 5. Fund all vesting wallets in one confidential batch transfer.
+    // 4. Fund all vesting wallets in one confidential batch transfer.
     const vestingPlans = plans.map((p, i) => ({
       encryptedAmount: handles[i] as Hex,
       initArgs: p.initArgs,
