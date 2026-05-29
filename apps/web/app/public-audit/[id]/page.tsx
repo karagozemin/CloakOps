@@ -217,7 +217,9 @@ export default function PublicAuditPage() {
                   rel="noreferrer"
                   className="text-gold hover:underline"
                 >
-                  {campaign.tokenOpsCampaignId}
+                  {campaign.tokenOpsCampaignId
+                    ? `${shortAddress(campaign.tokenOpsCampaignId, 6)} · view proof ↗`
+                    : "view proof ↗"}
                 </a>
               ) : (
                 <span className="text-cloak-muted">Not synced</span>

@@ -1,7 +1,7 @@
 import type { Address } from "viem";
 import type { ParsedRecipient } from "@/lib/csv/parse";
 import type { ZamaProvider } from "@/lib/zama/types";
-import { tokenOpsVestingLink, tokenOpsVestingToken } from "@/lib/config";
+import { explorerTx, tokenOpsVestingToken } from "@/lib/config";
 import { hasLiveContract } from "@/lib/contracts";
 import type { OnChainClients } from "@/lib/wagmi/on-chain-clients";
 export type { OnChainClients } from "@/lib/wagmi/on-chain-clients";
@@ -175,6 +175,7 @@ export async function runCreateCampaign(
   // so a revert here is fatal — the campaign creator must hold a confidential
   // balance of the vesting token (the factory pulls it via confidentialTransferFrom).
   let tokenOpsResult: TokenOpsCampaignResult;
+  let tokenOpsSync: SyncRecipientsResult;
   try {
     onStep("tokenops", "active", "Connecting to TokenOps vesting factory…");
     tokenOpsResult = await tokenops.createCampaign({
@@ -196,7 +197,7 @@ export async function runCreateCampaign(
       "active",
       "Mint test balance, approve operator, then confirm confidential vesting funding…",
     );
-    await tokenops.syncRecipients({
+    tokenOpsSync = await tokenops.syncRecipients({
       tokenOpsCampaignId: tokenOpsResult.tokenOpsCampaignId,
       token: tokenOpsVestingToken(input.tokenAddress),
       claimStart: input.claimStart,
@@ -239,9 +240,12 @@ export async function runCreateCampaign(
     })),
     createdAt: Date.now(),
     txHash,
-    tokenOpsCampaignId:
-      tokenOpsResult.tokenOpsCampaignId ?? tokenOpsVestingLink()?.id,
-    tokenOpsUrl: tokenOpsResult.url ?? tokenOpsVestingLink()?.url,
+    tokenOpsCampaignId: tokenOpsResult.tokenOpsCampaignId,
+    // Link to the verifiable on-chain proof: the confidential funding tx that
+    // emits VestingWalletConfidentialFunded (falls back to the factory contract).
+    tokenOpsUrl: tokenOpsSync.txHash
+      ? explorerTx(tokenOpsSync.txHash)
+      : tokenOpsResult.url,
     notes: input.notes,
     source: "onchain",
   };

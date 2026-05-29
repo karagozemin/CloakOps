@@ -83,6 +83,8 @@ export interface SyncRecipientsResult {
   tokenOpsCampaignId: string;
   synced: number;
   status: "synced" | "partial";
+  /** Confidential funding tx hash — the verifiable on-chain proof. */
+  txHash?: string;
 }
 
 export interface CreateDistributionOperationInput {

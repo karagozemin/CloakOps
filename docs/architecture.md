@@ -149,9 +149,10 @@ TokenOps distribution rails.
 
 ### TokenOps layer (`lib/tokenops`)
 
-- **`RealTokenOpsAdapter`** — wraps `@tokenops/sdk` confidential-airdrop factory.
-- If `NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL` is set, `createCampaign` links
-  to the existing vesting schedule instead of deploying a new airdrop.
+- **`RealTokenOpsAdapter`** — drives the TokenOps confidential-vesting factory
+  (`createVestingWalletConfidential` + `batchFundVestingWalletConfidential`).
+- The campaign's "TokenOps vesting" link points to the on-chain funding tx
+  (`VestingWalletConfidentialFunded`) on Etherscan — the verifiable proof.
 - **`syncRecipients`** receives wallet addresses only — never plaintext amounts.
 - **`TokenOpsProvider`** (React context) exposes connection status + operation log.
 

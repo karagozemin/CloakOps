@@ -1,7 +1,7 @@
 import {
   TOKENOPS_AUTO_MINT,
   TOKENOPS_VESTING_FACTORY,
-  tokenOpsVestingLink,
+  explorerAddress,
   tokenOpsVestingToken,
 } from "@/lib/config";
 import type { Address, Hex, PublicClient, WalletClient } from "viem";
@@ -117,7 +117,7 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       tokenOpsCampaignId: factory,
       status: "created",
       createdAt: Date.now(),
-      url: tokenOpsVestingLink()?.url,
+      url: explorerAddress(factory),
     };
   }
 
@@ -284,6 +284,7 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       tokenOpsCampaignId: input.tokenOpsCampaignId,
       synced: plans.length,
       status: "synced",
+      txHash: fundHash,
     };
   }
 

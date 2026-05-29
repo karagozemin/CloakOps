@@ -178,8 +178,8 @@ NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN=0xFaac272CDE1701479932935a3567652873c377EF
 # Auto-mint the required confidential balance to the creator before funding.
 # Requires a permissionless faucet token; set "false" for non-mintable tokens.
 NEXT_PUBLIC_TOKENOPS_AUTO_MINT=true
-
-# Optional: dashboard schedule deep-link shown in the UI.
-NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_ID=6a189b396f763543bff332be
-NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL=https://app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be
 ```
+
+The campaign's "TokenOps vesting" link surfaces the verifiable on-chain proof —
+the confidential funding tx (`VestingWalletConfidentialFunded`) on Etherscan —
+rather than the dashboard schedule page (see [Honest limitation](#honest-limitation)).

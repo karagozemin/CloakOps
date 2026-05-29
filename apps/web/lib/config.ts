@@ -35,6 +35,10 @@ export function explorerAddress(address: string): string {
   return `${EXPLORER_BASE}/address/${address}`;
 }
 
+export function explorerTx(txHash: string): string {
+  return `${EXPLORER_BASE}/tx/${txHash}`;
+}
+
 /** Campaign types — must match the on-chain enum order. */
 export const CAMPAIGN_TYPES = [
   {
@@ -70,11 +74,6 @@ export function campaignTypeLabel(id: number): string {
 export const hasLiveContractAddressNote =
   "Not configured (set NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS after deploy)";
 
-/** TokenOps x ZAMA vesting schedule deployed on Sepolia (dashboard tracking page). */
-export const TOKENOPS_VESTING_SCHEDULE_ID =
-  process.env.NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_ID ??
-  "6a189b396f763543bff332be";
-
 /**
  * TokenOps confidential vesting factory
  * (`TokenOpsVestingWalletCliffExecutorConfidentialFactory`) on Sepolia — the
@@ -103,10 +102,6 @@ export const TOKENOPS_VESTING_TOKEN = envAddress(
 export const TOKENOPS_AUTO_MINT =
   process.env.NEXT_PUBLIC_TOKENOPS_AUTO_MINT !== "false";
 
-export const TOKENOPS_VESTING_SCHEDULE_URL =
-  process.env.NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL ??
-  `https://app.tokenops.xyz/contract/schedules/${TOKENOPS_VESTING_SCHEDULE_ID}`;
-
 /** ERC-7984 token for TokenOps vesting txs — env override or CloakOps token. */
 export function tokenOpsVestingToken(
   campaignToken?: string,
@@ -117,15 +112,4 @@ export function tokenOpsVestingToken(
   throw new Error(
     "Set NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN or NEXT_PUBLIC_CLOAKOPS_TOKEN_ADDRESS.",
   );
-}
-
-/** Live TokenOps vesting rail link when schedule id is configured. */
-export function tokenOpsVestingLink():
-  | { id: string; url: string }
-  | undefined {
-  if (!TOKENOPS_VESTING_SCHEDULE_ID) return undefined;
-  return {
-    id: TOKENOPS_VESTING_SCHEDULE_ID,
-    url: TOKENOPS_VESTING_SCHEDULE_URL,
-  };
 }
