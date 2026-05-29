@@ -50,7 +50,7 @@ export default function RootLayout({
             <SiteHeader />
             <main className="relative flex-1">
               <AppBackground />
-              {children}
+              <div className="relative z-10">{children}</div>
             </main>
             <SiteFooter />
           </div>

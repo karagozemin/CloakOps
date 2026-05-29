@@ -19,29 +19,31 @@ const Beams = dynamic(() => import("@/components/backgrounds/Beams"), {
   ssr: false,
 });
 
+const dotGridProps = {
+  dotSize: 2,
+  gap: 32,
+  baseColor: "#353D48",
+  activeColor: "#E8B923",
+  proximity: 130,
+  speedTrigger: 100,
+};
+
 export function HeroBackground() {
   return (
     <>
-      <SectionBackground opacity={0.65}>
+      <SectionBackground opacity={0.55}>
         <LightRays
           raysColor="#E8B923"
           raysOrigin="top-center"
           lightSpread={0.85}
-          fadeDistance={1.3}
-          saturation={0.35}
+          fadeDistance={1.2}
+          saturation={0.45}
           followMouse={false}
           rayLength={1.4}
         />
       </SectionBackground>
-      <SectionBackground className="-z-[9]" opacity={0.55}>
-        <DotGrid
-          dotSize={2}
-          gap={32}
-          baseColor="#222831"
-          activeColor="#E8B923"
-          proximity={120}
-          speedTrigger={120}
-        />
+      <SectionBackground className="-z-[9]" opacity={0.5}>
+        <DotGrid {...dotGridProps} />
       </SectionBackground>
     </>
   );
@@ -49,15 +51,15 @@ export function HeroBackground() {
 
 export function PrivacyBackground() {
   return (
-    <SectionBackground opacity={0.35}>
+    <SectionBackground fullBleed opacity={0.4}>
       <Particles
-        particleCount={60}
+        particleCount={65}
         particleSpread={12}
         speed={0.06}
-        particleColors={["#E8B923", "#5A616B", "#5B9BD5"]}
+        particleColors={["#E8B923", "#6B7280", "#5B9BD5"]}
         moveParticlesOnHover={false}
         alphaParticles
-        particleBaseSize={80}
+        particleBaseSize={85}
         sizeRandomness={0.8}
         disableRotation
       />
@@ -67,11 +69,11 @@ export function PrivacyBackground() {
 
 export function SolutionBackground() {
   return (
-    <SectionBackground opacity={0.4}>
+    <SectionBackground fullBleed opacity={0.45}>
       <Aurora
-        colorStops={["#070809", "#E8B923", "#5B9BD5"]}
-        amplitude={0.55}
-        blend={0.45}
+        colorStops={["#0b0d10", "#E8B923", "#5B9BD5"]}
+        amplitude={0.6}
+        blend={0.48}
         speed={0.35}
       />
     </SectionBackground>
@@ -80,7 +82,7 @@ export function SolutionBackground() {
 
 export function TrackBackground() {
   return (
-    <SectionBackground opacity={0.5}>
+    <SectionBackground fullBleed opacity={0.55}>
       <Beams
         beamWidth={2}
         beamHeight={18}
@@ -97,15 +99,8 @@ export function TrackBackground() {
 
 export function AppPageBackground() {
   return (
-    <SectionBackground className="fixed inset-0 -z-10" opacity={0.3}>
-      <DotGrid
-        dotSize={2}
-        gap={36}
-        baseColor="#222831"
-        activeColor="#E8B923"
-        proximity={100}
-        speedTrigger={140}
-      />
+    <SectionBackground variant="viewport" opacity={0.48}>
+      <DotGrid {...dotGridProps} />
     </SectionBackground>
   );
 }

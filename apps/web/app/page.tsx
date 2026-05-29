@@ -22,11 +22,11 @@ import {
 
 export default function LandingPage() {
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6">
-      {/* Hero */}
-      <section className="relative overflow-hidden py-16 sm:py-24">
+    <>
+      {/* Hero — full viewport width so backgrounds edge-to-edge */}
+      <section className="relative w-full overflow-hidden py-16 sm:py-24">
         <HeroBackground />
-        <div className="mx-auto max-w-3xl text-center">
+        <div className="relative z-10 mx-auto max-w-3xl px-4 text-center sm:px-6">
           <div className="mb-6 flex justify-center">
             <Logo size="2xl" priority className="drop-shadow-glow" />
           </div>
@@ -63,6 +63,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
       {/* Privacy split */}
       <section className="relative grid gap-4 pb-16 md:grid-cols-2">
         <PrivacyBackground />
@@ -224,6 +225,7 @@ export default function LandingPage() {
           </CardBody>
         </Card>
       </section>
-    </div>
+      </div>
+    </>
   );
 }
