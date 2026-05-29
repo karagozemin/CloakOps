@@ -63,6 +63,24 @@ vesting wallets. On-chain proof: [`docs/tokenops-integration.md`](docs/tokenops-
 | **Zama Builder Track** | End-to-end FHE dApp: client encrypt → on-chain `euint64`/`euint8` storage → recipient `userDecrypt` → claim payout via `FHE.add` on `CloakConfidentialToken`. Deployed on Sepolia with the Zama Relayer SDK. |
 | **TokenOps Special Bounty** | Real on-chain integration with the TokenOps confidential vesting factory: `createVestingWalletConfidential` (deploy) + `batchFundVestingWalletConfidential` (fund) with **browser-encrypted `euint64` amounts**, batched through Multicall3 so signatures stay fixed regardless of stakeholder count, plus a live operation log in the UI. See [`docs/tokenops-integration.md`](docs/tokenops-integration.md). |
 
+### What CloakOps adds to TokenOps
+
+CloakOps is a **product extension on top of TokenOps confidential vesting**, not
+a parallel reimplementation:
+
+- **A metadata layer the TokenOps UI doesn't expose** — confidential, per-recipient
+  **tier (`euint8`)** and **vesting class (`euint8`)** alongside the encrypted
+  allocation, with FHE access control so only each recipient can decrypt their own
+  row. TokenOps moves the tokens; CloakOps encodes *who they are and on what terms*,
+  confidentially.
+- **Past the UI's single-stakeholder cap** — the dashboard wizard funds one
+  stakeholder at a time, so CloakOps calls the same factory **directly** and batches
+  **many** stakeholders (deploy + fund) through Multicall3 in a fixed signature
+  count — the multi-recipient flow the UI can't yet do, on the contract that can.
+- **A confidential campaign front-end + public audit page** — admins run encrypted
+  campaigns and anyone can verify public rules (budget, window, claimed count) while
+  every allocation stays encrypted, end to end.
+
 ---
 
 ## Privacy model

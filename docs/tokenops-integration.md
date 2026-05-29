@@ -205,6 +205,17 @@ events above), which is exactly what the in-app link surfaces.
 > through Multicall3 — a more complete integration than the minimal UI path,
 > while staying consistent with the contract's real capabilities.
 
+**Empirically verified.** We also created a confidential vesting schedule
+end-to-end through TokenOps' own "TokenOps × ZAMA" dashboard wizard with a single
+stakeholder funded in CTestToken — mint, deploy, and the `ConfidentialTransfer`
+funding tx all confirmed on-chain in MetaMask. The dashboard's stakeholder table
+still renders `0.00` / "No items found", **because the allocation is FHE-encrypted
+on-chain**: the dashboard's plaintext columns (Allocation, Funded Amount, Vested…)
+cannot display an `euint64` that only the beneficiary can decrypt. In other words,
+the "empty" dashboard *is the privacy guarantee working* — the funding is real and
+event-verifiable on Etherscan, but the amounts are confidential by design. This is
+exactly the property CloakOps exists to provide.
+
 ## Environment variables
 
 ```env
