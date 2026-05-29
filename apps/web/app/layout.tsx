@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { AppBackground } from "@/components/backgrounds/app-background";
 
 export const metadata: Metadata = {
-  title: "CloakOps — Confidential campaign layer for TokenOps",
+  title: "CloakOps",
   description:
     "Run private token rounds, contributor rewards, advisor vesting, and community distributions where allocations, tiers, and vesting stay encrypted with Zama FHE, while campaign rules and totals remain publicly verifiable.",
   keywords: [
