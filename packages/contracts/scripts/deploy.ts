@@ -4,8 +4,8 @@ import { join } from "path";
 
 /**
  * Deploys the CloakOps contracts:
- *   - MockConfidentialToken (demo campaign token reference)
- *   - ConfidentialCampaign  (the confidential campaign + claim layer)
+ *   - CloakConfidentialToken (cCLOAK confidential payout token)
+ *   - ConfidentialCampaign   (the confidential campaign + claim layer)
  *
  * On Sepolia, ConfidentialCampaign inherits ZamaEthereumConfig and is wired to
  * the live FHEVM coprocessor automatically.

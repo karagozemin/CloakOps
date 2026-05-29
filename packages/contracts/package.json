@@ -8,10 +8,7 @@
     "test": "hardhat test",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
-    "demo-campaign": "hardhat run scripts/create-demo-campaign.ts --network sepolia",
-    "export-abi": "hardhat run scripts/export-abi.ts",
-    "mint-cdemo": "hardhat run scripts/mint-cdemo.ts --network sepolia",
-    "verify-cdemo": "hardhat verify --network sepolia 0x64b18e14F1A47C4152a69Ad12e50C6B9F0c6dd2E \"CloakOps Demo Token\" cDEMO 18 10000000000000000000000000"
+    "export-abi": "hardhat run scripts/export-abi.ts"
   },
   "devDependencies": {
     "@fhevm/hardhat-plugin": "^0.4.2",

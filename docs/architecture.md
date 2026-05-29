@@ -84,7 +84,7 @@ CloakOps/
 │       ├── zama/                RealZamaProvider (Relayer SDK)
 │       ├── tokenops/            RealTokenOpsAdapter (@tokenops/sdk)
 │       ├── campaigns/           create-flow, store, hooks, onchain.ts
-│       ├── contracts/           ABI, read/write helpers, deployed-address
+│       ├── contracts/           ABI, read/write helpers
 │       ├── csv/                 Papaparse allocation parser
 │       ├── sample/              Sample CSV dataset for admin
 │       └── wagmi/               Wallet + on-chain client resolution
@@ -93,7 +93,7 @@ CloakOps/
 │   │   ├── ConfidentialCampaign.sol
 │   │   └── CloakConfidentialToken.sol
 │   ├── test/                    FHEVM mock-mode tests (13 passing)
-│   └── scripts/                 deploy.ts, export-abi.ts, create-demo-campaign.ts
+│   └── scripts/                 deploy.ts, export-abi.ts
 └── docs/                        architecture, privacy-model, tokenops-integration, …
 ```
 
@@ -134,11 +134,6 @@ ERC-7984-style confidential balance token for testnet settlement.
 
 On mainnet this slot would be a production confidential token managed via
 TokenOps distribution rails.
-
-### `MockConfidentialToken.sol`
-
-Legacy plain ERC-20 kept in the repo for reference; **not deployed** by the
-current `deploy.ts` script.
 
 ---
 

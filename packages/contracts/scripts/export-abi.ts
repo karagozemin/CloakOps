@@ -1,10 +1,11 @@
 import { artifacts } from "hardhat";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
 /**
- * Exports the ConfidentialCampaign ABI (and any saved Sepolia address) into the
- * web app at apps/web/lib/contracts so the frontend has typed, in-sync bindings.
+ * Exports the ConfidentialCampaign + CloakConfidentialToken ABIs into the web
+ * app at apps/web/lib/contracts so the frontend has typed, in-sync bindings.
+ * (Deployed addresses are configured via NEXT_PUBLIC_* env vars, not generated.)
  */
 async function main() {
   const campaign = await artifacts.readArtifact("ConfidentialCampaign");
@@ -36,20 +37,6 @@ async function main() {
       )} as const;\n`,
   );
   console.log(`Token ABI written: ${tokenAbiFile}`);
-
-  // If a deployment exists, surface the address as a generated default.
-  const sepoliaPath = join(__dirname, "..", "deployments", "sepolia.json");
-  if (existsSync(sepoliaPath)) {
-    const dep = JSON.parse(readFileSync(sepoliaPath, "utf8"));
-    const addrFile = join(outDir, "deployed-address.ts");
-    writeFileSync(
-      addrFile,
-      `// AUTO-GENERATED from packages/contracts/deployments/sepolia.json.\n` +
-        `export const DEPLOYED_CLOAKOPS_ADDRESS = "${dep.contracts.ConfidentialCampaign}" as const;\n` +
-        `export const DEPLOYED_TOKEN_ADDRESS = "${dep.contracts.CloakConfidentialToken}" as const;\n`,
-    );
-    console.log(`Deployed address written: ${addrFile}`);
-  }
 }
 
 main().catch((error) => {

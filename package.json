@@ -14,7 +14,6 @@
     "compile": "npm run compile --workspace packages/contracts",
     "test": "npm run test --workspace packages/contracts",
     "deploy:sepolia": "npm run deploy:sepolia --workspace packages/contracts",
-    "demo-campaign": "npm run demo-campaign --workspace packages/contracts",
     "export-abi": "npm run export-abi --workspace packages/contracts"
   },
   "engines": {
