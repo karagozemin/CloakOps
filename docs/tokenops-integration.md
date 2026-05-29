@@ -187,6 +187,18 @@ factory the dashboard uses, but cannot inject rows into another product's
 private backend. The canonical, trustless proof is therefore on-chain (Etherscan
 events above), which is exactly what the in-app link surfaces.
 
+> **Confirmed by the TokenOps team.** In hackathon support, Gedas (TokenOps)
+> confirmed that the factory-based confidential vesting path is the correct
+> integration, that the vesting UI's single-stakeholder cap is a v1 contract
+> limit (not a bug), that funding requires a real ERC-7984 confidential token
+> (the in-app CTestToken or any wrapped Zama cToken from
+> [portfolio.zama.org](https://portfolio.zama.org/)), and that the dashboard
+> "fund" / schedule view is a **bonus** for this hackathon — the primary demo is
+> CloakOps' own `ConfidentialCampaign` FHE contract. Populating a dashboard
+> schedule row requires creating it through TokenOps' own "Add distribution" UI
+> (which writes to their backend); the on-chain factory integration here is the
+> trustless equivalent.
+
 ## Environment variables
 
 ```env
