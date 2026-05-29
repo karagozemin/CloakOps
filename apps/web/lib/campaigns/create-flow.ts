@@ -170,7 +170,11 @@ export async function runCreateCampaign(
     throw err;
   }
 
-  let tokenOpsResult: TokenOpsCampaignResult;
+  // TokenOps sync is best-effort: the CloakOps on-chain campaign (above) is the
+  // canonical source of truth. A TokenOps revert (e.g. the connected wallet
+  // lacks a confidential balance of the vesting token) must NOT discard a
+  // campaign that is already live on Sepolia.
+  let tokenOpsResult: TokenOpsCampaignResult | undefined;
   try {
     onStep("tokenops", "active", "Connecting to TokenOps vesting manager…");
     tokenOpsResult = await tokenops.createCampaign({
@@ -212,8 +216,12 @@ export async function runCreateCampaign(
     });
     onStep("tokenops", "done", "Stakeholders synced to TokenOps vesting.");
   } catch (err) {
-    onStep("tokenops", "error", errMsg(err));
-    throw err;
+    // Non-fatal: keep the campaign, surface the reason on the step.
+    onStep(
+      "tokenops",
+      "done",
+      `Campaign saved; TokenOps vesting sync skipped: ${errMsg(err)}`,
+    );
   }
 
   onStep("ready", "active");
@@ -236,8 +244,10 @@ export async function runCreateCampaign(
     createdAt: Date.now(),
     txHash,
     tokenOpsCampaignId:
-      tokenOpsResult.tokenOpsCampaignId ?? tokenOpsResult.managerAddress,
-    tokenOpsUrl: tokenOpsResult.url ?? tokenOpsVestingLink()?.url,
+      tokenOpsResult?.tokenOpsCampaignId ??
+      tokenOpsResult?.managerAddress ??
+      tokenOpsVestingLink()?.id,
+    tokenOpsUrl: tokenOpsResult?.url ?? tokenOpsVestingLink()?.url,
     notes: input.notes,
     source: "onchain",
   };
