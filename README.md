@@ -13,6 +13,17 @@ verifiable**.
 > Built for the Zama Developer Program (Mainnet Season 3) — **Builder Track**
 > and the **TokenOps Special Bounty**.
 
+### Submission links
+
+| | Link |
+| --- | --- |
+| **Live demo** | [cloak-ops.vercel.app](https://cloak-ops.vercel.app/) |
+| **Video demo** | _Add your Loom / YouTube URL_ |
+| **ConfidentialCampaign (Sepolia)** | [`0x468d…C885`](https://sepolia.etherscan.io/address/0x468d1Ab3bd52CbF43E4833A5696E47325De9C885) |
+| **TokenOps funding (example tx)** | [`0x3de4…2cd9e`](https://sepolia.etherscan.io/tx/0x3de4905d8b5dcd3cfada7d51ddffecf54710c07fe1c6661ddc4e1bac1ef2cd9e) |
+
+Full submission pack (pitch, demo order, checklist): [`docs/SUBMISSION.md`](docs/SUBMISSION.md).
+
 ---
 
 ## The problem

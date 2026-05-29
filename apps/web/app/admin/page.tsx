@@ -10,9 +10,11 @@ import { StepIndicator, type StepStatus } from "@/components/ui/step-indicator";
 import { TokenOpsPanel } from "@/components/tokenops/tokenops-panel";
 import { CsvEditor } from "@/components/admin/csv-editor";
 import { RecipientBuilder } from "@/components/admin/recipient-builder";
+import { BudgetChecksum } from "@/components/admin/budget-checksum";
 import { useZama } from "@/lib/zama";
 import { useTokenOps } from "@/lib/tokenops/context";
 import { parseAllocationCsv, type CsvParseResult } from "@/lib/csv/parse";
+import { getBudgetCheck } from "@/lib/csv/budget-check";
 import {
   runCreateCampaign,
   type FlowStepKey,
@@ -81,8 +83,10 @@ export default function AdminPage() {
   );
 
   const budgetNum = Number(totalBudget || 0);
-  const overBudget =
-    parseResult && budgetNum > 0 && parseResult.totalAllocation > budgetNum;
+  const budgetCheck = parseResult
+    ? getBudgetCheck(parseResult.totalAllocation, budgetNum)
+    : null;
+  const overBudget = budgetCheck?.status === "over";
 
   function loadSampleCsv() {
     setName(SAMPLE_CAMPAIGN.name);
@@ -350,22 +354,12 @@ export default function AdminPage() {
                       </p>
                     </div>
                   ) : null}
-                  {budgetNum > 0 && parseResult ? (
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span
-                        className={cn(
-                          "chip",
-                          overBudget &&
-                            "border-cloak-danger/40 text-cloak-danger",
-                        )}
-                      >
-                        Σ allocations:{" "}
-                        {formatNumber(parseResult.totalAllocation)}
-                      </span>
-                      <span className="chip">
-                        budget: {formatNumber(budgetNum)}
-                      </span>
-                    </div>
+                  {parseResult && budgetNum > 0 ? (
+                    <BudgetChecksum
+                      totalAllocation={parseResult.totalAllocation}
+                      budget={budgetNum}
+                      recipientCount={parseResult.recipients.length}
+                    />
                   ) : null}
                 </>
               ) : (
@@ -396,12 +390,30 @@ export default function AdminPage() {
               subtitle="Encrypt → submit → TokenOps sync"
             />
             <CardBody className="space-y-5">
-              <div className="rounded-lg border border-gold/20 bg-gold/5 p-3 text-xs text-cloak-muted">
-                <Lock className="mr-1.5 inline h-3 w-3 text-gold" />
-                Allocations, tiers, and vesting are encrypted client-side with{" "}
-                Zama before submission. TokenOps vesting receives encrypted
-                allocations via `@tokenops/sdk` — plaintext amounts stay off the
-                public dashboard.
+              <div className="space-y-3">
+                <div className="rounded-lg border border-gold/20 bg-gold/5 p-3 text-xs text-cloak-muted">
+                  <Lock className="mr-1.5 inline h-3 w-3 text-gold" />
+                  Allocations, tiers, and vesting are encrypted client-side with
+                  Zama before submission. TokenOps vesting receives encrypted
+                  amounts via `@tokenops/sdk` — plaintext amounts stay off the
+                  public dashboard.
+                </div>
+                <div className="rounded-lg border border-cloak-line bg-ink-900/60 p-3 text-xs text-cloak-muted">
+                  <p className="font-medium text-cloak-fg">Two settlement rails</p>
+                  <ul className="mt-2 space-y-1.5">
+                    <li>
+                      <span className="text-gold">Claim rail</span> — recipient
+                      calls `claim()` → encrypted balance credited via `FHE.add`
+                      on `CloakConfidentialToken`.
+                    </li>
+                    <li>
+                      <span className="text-gold">TokenOps rail</span> — this
+                      flow deploys + funds per-recipient vesting wallets on the
+                      official confidential factory (same allocation, schedule-based
+                      release).
+                    </li>
+                  </ul>
+                </div>
               </div>
 
               <StepIndicator steps={STEPS} statuses={statuses} />
@@ -498,7 +510,6 @@ function RecipientsPreview({
   result: CsvParseResult;
   budget: number;
 }) {
-  const over = budget > 0 && result.totalAllocation > budget;
   return (
     <div className="space-y-3">
       {result.errors.length > 0 ? (
@@ -514,17 +525,20 @@ function RecipientsPreview({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="chip">
-          {result.recipients.length} recipients
-        </span>
-        <span className={cn("chip", over && "border-cloak-danger/40 text-cloak-danger")}>
-          Σ allocations: {formatNumber(result.totalAllocation)}
-        </span>
-        {budget > 0 ? (
-          <span className="chip">budget: {formatNumber(budget)}</span>
-        ) : null}
-      </div>
+      {budget > 0 ? (
+        <BudgetChecksum
+          totalAllocation={result.totalAllocation}
+          budget={budget}
+          recipientCount={result.recipients.length}
+        />
+      ) : (
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="chip">{result.recipients.length} recipients</span>
+          <span className="chip">
+            Σ allocations: {formatNumber(result.totalAllocation)}
+          </span>
+        </div>
+      )}
 
       {result.recipients.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-cloak-line">

@@ -103,3 +103,9 @@ recipients ledger with addresses visible but amounts locked.)
 - "Private allocations. Public rules. TokenOps execution."
 - "Encrypted with Zama FHE — only the recipient can decrypt."
 - "TokenOps is the distribution rail; CloakOps adds the confidential layer."
+- "Verifiable sum — Σ allocations matches the public budget before encryption."
+
+### Admin: verifiable sum moment
+After **Load sample CSV**, point at the green **Verifiable sum — allocations match
+public budget** badge (Σ 1,000,000 = budget 1,000,000). This is checked before
+encryption; individual amounts still go on-chain as FHE ciphertexts only.

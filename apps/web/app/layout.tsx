@@ -5,7 +5,12 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { AppBackground } from "@/components/backgrounds/app-background";
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+  "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "CloakOps",
   description:
     "Run private token rounds, contributor rewards, advisor vesting, and community distributions where allocations, tiers, and vesting stay encrypted with Zama FHE, while campaign rules and totals remain publicly verifiable.",
