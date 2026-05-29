@@ -1,4 +1,3 @@
-import { sepolia } from "viem/chains";
 import { getAddress } from "viem";
 
 /**
@@ -17,7 +16,6 @@ function envAddress(value: string | undefined): `0x${string}` | "" {
 }
 
 export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 11155111);
-export const NETWORK_NAME = process.env.NEXT_PUBLIC_NETWORK_NAME ?? "sepolia";
 
 export const CLOAKOPS_CONTRACT_ADDRESS = envAddress(
   process.env.NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS,
@@ -28,25 +26,13 @@ export const CLOAKOPS_TOKEN_ADDRESS = envAddress(
   process.env.NEXT_PUBLIC_CLOAKOPS_TOKEN_ADDRESS,
 );
 
-/** Always real — Zama Relayer SDK on Sepolia. */
-export const ZAMA_MODE = "real" as const;
-
-/** Always real — @tokenops/sdk + live vesting link. */
-export const TOKENOPS_MODE = "real" as const;
-
 export const WALLETCONNECT_PROJECT_ID =
   process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
-
-export const ACTIVE_CHAIN = sepolia;
 
 export const EXPLORER_BASE = "https://sepolia.etherscan.io";
 
 export function explorerAddress(address: string): string {
   return `${EXPLORER_BASE}/address/${address}`;
-}
-
-export function explorerTx(hash: string): string {
-  return `${EXPLORER_BASE}/tx/${hash}`;
 }
 
 /** Campaign types — must match the on-chain enum order. */
@@ -77,13 +63,9 @@ export const CAMPAIGN_TYPES = [
   },
 ] as const;
 
-export type CampaignTypeId = (typeof CAMPAIGN_TYPES)[number]["id"];
-
 export function campaignTypeLabel(id: number): string {
   return CAMPAIGN_TYPES.find((t) => t.id === id)?.label ?? "Unknown";
 }
-
-export const isContractConfigured = Boolean(CLOAKOPS_CONTRACT_ADDRESS);
 
 export const hasLiveContractAddressNote =
   "Not configured (set NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS after deploy)";

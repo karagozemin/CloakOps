@@ -24,7 +24,6 @@ import type {
   SyncRecipientsInput,
   SyncRecipientsResult,
   TokenOpsAdapterOptions,
-  TokenOpsAnalytics,
   TokenOpsCampaignAdapter,
   TokenOpsCampaignResult,
   TokenOpsLogger,
@@ -307,9 +306,6 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
     };
   }
 
-  async getAnalytics(campaignId: string): Promise<TokenOpsAnalytics> {
-    return emptyAnalytics(campaignId);
-  }
 }
 
 export class TokenOpsRealModeError extends Error {
@@ -317,14 +313,4 @@ export class TokenOpsRealModeError extends Error {
     super(message);
     this.name = "TokenOpsRealModeError";
   }
-}
-
-function emptyAnalytics(campaignId: string): TokenOpsAnalytics {
-  return {
-    tokenOpsCampaignId: campaignId,
-    recipients: 0,
-    claimed: 0,
-    pending: 0,
-    totalBudget: "0",
-  };
 }

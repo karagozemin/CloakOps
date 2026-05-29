@@ -105,15 +105,6 @@ export interface DistributionOperationResult {
   rail: "confidential" | "standard";
 }
 
-export interface TokenOpsAnalytics {
-  tokenOpsCampaignId: string;
-  recipients: number;
-  claimed: number;
-  pending: number;
-  /** Public total only; per-recipient amounts stay encrypted. */
-  totalBudget: string;
-}
-
 export type TokenOpsLogLevel = "info" | "success" | "warn" | "error";
 
 export interface TokenOpsLogEntry {
@@ -145,5 +136,4 @@ export interface TokenOpsCampaignAdapter {
   createDistributionOperation(
     input: CreateDistributionOperationInput,
   ): Promise<DistributionOperationResult>;
-  getAnalytics(campaignId: string): Promise<TokenOpsAnalytics>;
 }

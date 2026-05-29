@@ -34,14 +34,6 @@ export const campaignStore = {
     return read();
   },
 
-  list(): CampaignRecord[] {
-    return read();
-  },
-
-  get(id: string): CampaignRecord | undefined {
-    return read().find((c) => c.id === id || String(c.onChainId) === id);
-  },
-
   upsert(campaign: CampaignRecord) {
     const all = read();
     const idx = all.findIndex((c) => c.id === campaign.id);
@@ -65,26 +57,6 @@ export const campaignStore = {
       };
     });
     write(next);
-  },
-
-  addRecipient(id: string, recipient: RecipientRecord) {
-    const all = read();
-    const next = all.map((c) => {
-      if (c.id !== id && String(c.onChainId) !== id) return c;
-      if (
-        c.recipients.some(
-          (r) => r.wallet.toLowerCase() === recipient.wallet.toLowerCase(),
-        )
-      ) {
-        return c;
-      }
-      return { ...c, recipients: [...c.recipients, recipient] };
-    });
-    write(next);
-  },
-
-  reset() {
-    write([]);
   },
 };
 

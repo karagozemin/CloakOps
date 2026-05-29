@@ -31,7 +31,3 @@ export function toUnixSeconds(value: string): number {
   if (!value) return 0;
   return Math.floor(new Date(value).getTime() / 1000);
 }
-
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

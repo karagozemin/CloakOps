@@ -1,5 +1,3 @@
-import type { ParsedRecipient } from "@/lib/csv/parse";
-
 /** Sample campaign for the admin CSV loader (Sepolia). */
 export const SAMPLE_CAMPAIGN = {
   name: "AI x Crypto Seed Contributors",
@@ -32,42 +30,3 @@ export const VESTING_LABELS: Record<number, string> = {
   3: "Class 3 · 12mo cliff, 36mo linear",
   4: "Class 4 · 18mo cliff, 36mo linear",
 };
-
-/** Parsed sample recipients (same rows as SAMPLE_CSV). */
-export const SAMPLE_RECIPIENTS: ParsedRecipient[] = [
-  {
-    wallet: "0x1111111111111111111111111111111111111111",
-    allocation: 25000,
-    tier: 2,
-    vestingClass: 1,
-    role: "contributor",
-  },
-  {
-    wallet: "0x2222222222222222222222222222222222222222",
-    allocation: 75000,
-    tier: 3,
-    vestingClass: 2,
-    role: "core-contributor",
-  },
-  {
-    wallet: "0x3333333333333333333333333333333333333333",
-    allocation: 150000,
-    tier: 4,
-    vestingClass: 3,
-    role: "advisor",
-  },
-  {
-    wallet: "0x4444444444444444444444444444444444444444",
-    allocation: 300000,
-    tier: 5,
-    vestingClass: 4,
-    role: "angel-investor",
-  },
-  {
-    wallet: "0x5555555555555555555555555555555555555555",
-    allocation: 450000,
-    tier: 5,
-    vestingClass: 4,
-    role: "strategic-investor",
-  },
-];

@@ -38,7 +38,6 @@ interface TokenOpsContextValue {
   createDistributionOperation: (
     input: CreateDistributionOperationInput,
   ) => Promise<DistributionOperationResult>;
-  clearLog: () => void;
 }
 
 const TokenOpsContext = createContext<TokenOpsContextValue | null>(null);
@@ -117,7 +116,6 @@ export function TokenOpsProvider({ children }: { children: ReactNode }) {
       adapterRef.current.createDistributionOperation(input),
     [],
   );
-  const clearLog = useCallback(() => setLog([]), []);
 
   const value = useMemo<TokenOpsContextValue>(
     () => ({
@@ -129,7 +127,6 @@ export function TokenOpsProvider({ children }: { children: ReactNode }) {
       createCampaign,
       syncRecipients,
       createDistributionOperation,
-      clearLog,
     }),
     [
       mode,
@@ -140,7 +137,6 @@ export function TokenOpsProvider({ children }: { children: ReactNode }) {
       createCampaign,
       syncRecipients,
       createDistributionOperation,
-      clearLog,
     ],
   );
 
