@@ -1,4 +1,5 @@
 import {
+  TOKENOPS_AUTO_MINT,
   TOKENOPS_VESTING_FACTORY,
   tokenOpsDashboardUrl,
   tokenOpsVestingLink,
@@ -10,6 +11,7 @@ import {
   TOKENOPS_VESTING_FACTORY_ABI,
   buildVestingInitArgs,
   ensureTokenOperator,
+  mintConfidentialTestTokens,
   resolveTokenOpsRelayerUrl,
 } from "./vesting-helpers";
 import type {
@@ -142,6 +144,33 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
 
     const factory = (input.tokenOpsCampaignId as Address) || TOKENOPS_VESTING_FACTORY;
     const token = (input.token ?? tokenOpsVestingToken()) as Address;
+
+    const totalAllocation = input.recipients.reduce(
+      (sum, r) => sum + BigInt(r.allocation),
+      0n,
+    );
+
+    // 0. Mint the required confidential test-token balance to the funder so the
+    //    factory's confidentialTransferFrom always has funds to pull (faucet token).
+    if (TOKENOPS_AUTO_MINT) {
+      this.log({
+        level: "info",
+        op: "syncRecipients",
+        message: `Minting ${totalAllocation} confidential test token(s) to funder…`,
+      });
+      const mintHash = await mintConfidentialTestTokens(
+        token,
+        account,
+        totalAllocation,
+        walletClient,
+        publicClient,
+      );
+      this.log({
+        level: "success",
+        op: "syncRecipients",
+        message: `Funder balance minted (tx ${mintHash.slice(0, 10)}…).`,
+      });
+    }
 
     // 1. Authorise the factory to pull confidential tokens from the funder.
     this.log({

@@ -194,7 +194,7 @@ export async function runCreateCampaign(
     onStep(
       "tokenops",
       "active",
-      "Approve TokenOps operator, then confirm confidential vesting funding in your wallet…",
+      "Mint test balance, approve operator, then confirm confidential vesting funding…",
     );
     await tokenops.syncRecipients({
       tokenOpsCampaignId: tokenOpsResult.tokenOpsCampaignId,

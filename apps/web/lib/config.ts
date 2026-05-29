@@ -117,6 +117,15 @@ export const TOKENOPS_VESTING_TOKEN = envAddress(
   process.env.NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN,
 );
 
+/**
+ * When true (default), the campaign creator auto-mints the required confidential
+ * test-token balance before funding TokenOps vesting. The configured vesting
+ * token must be a permissionless faucet (TestConfidentialWrapper.mint). Set to
+ * "false" for production tokens that are not mintable by arbitrary callers.
+ */
+export const TOKENOPS_AUTO_MINT =
+  process.env.NEXT_PUBLIC_TOKENOPS_AUTO_MINT !== "false";
+
 export const TOKENOPS_VESTING_SCHEDULE_URL =
   process.env.NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_URL ??
   `https://app.tokenops.xyz/contract/schedules/${TOKENOPS_VESTING_SCHEDULE_ID}`;

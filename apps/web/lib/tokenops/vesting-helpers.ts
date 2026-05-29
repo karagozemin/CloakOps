@@ -84,6 +84,47 @@ export function buildVestingInitArgs(
   ]);
 }
 
+/**
+ * Minimal ABI for the confidential test-token faucet (`TestConfidentialWrapper`).
+ * `mint(address,uint64)` is permissionless on Sepolia — any wallet can mint test
+ * balance to itself so the factory's confidentialTransferFrom has funds to pull.
+ */
+export const CONFIDENTIAL_TEST_TOKEN_ABI = [
+  {
+    type: "function",
+    name: "mint",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint64" },
+    ],
+    outputs: [{ name: "minted", type: "bytes32" }],
+  },
+] as const;
+
+/**
+ * Mint confidential test tokens to `account` so it holds a balance the vesting
+ * factory can pull when funding schedules. No-op-safe to call before funding.
+ */
+export async function mintConfidentialTestTokens(
+  token: Address,
+  account: Address,
+  amount: bigint,
+  walletClient: WalletClient,
+  publicClient: PublicClient,
+): Promise<Hex> {
+  const hash = await walletClient.writeContract({
+    address: token,
+    abi: CONFIDENTIAL_TEST_TOKEN_ABI,
+    functionName: "mint",
+    args: [account, amount],
+    account,
+    chain: walletClient.chain,
+  });
+  await waitForTransactionReceipt(publicClient, { hash });
+  return hash;
+}
+
 export function resolveTokenOpsRelayerUrl(): string | undefined {
   const useProxy = process.env.NEXT_PUBLIC_ZAMA_USE_RELAYER_PROXY !== "false";
   if (typeof window !== "undefined" && useProxy) {
