@@ -105,6 +105,26 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
     }
   }
 
+  /** True when `address` responds to the fhe-vesting manager interface. */
+  private async isCompatibleManager(
+    publicClient: PublicClient,
+    address: Address,
+  ): Promise<boolean> {
+    try {
+      const { createConfidentialVestingManagerClient } = await import(
+        "@tokenops/sdk/fhe-vesting"
+      );
+      const client = createConfidentialVestingManagerClient({
+        publicClient,
+        address,
+      });
+      await client.maxBatchSize();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async createCampaign(
     input: CreateTokenOpsCampaignInput,
   ): Promise<TokenOpsCampaignResult> {
@@ -118,12 +138,14 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       );
     }
 
+    // Only reuse the configured manager if it is a real fhe-vesting manager
+    // (the app.tokenops.xyz schedule may be a different, incompatible contract).
     const existingManager = TOKENOPS_VESTING_CONTRACT;
-    if (existingManager) {
+    if (existingManager && (await this.isCompatibleManager(publicClient, existingManager))) {
       this.log({
         level: "success",
         op: "createCampaign",
-        message: `Using TokenOps vesting manager ${existingManager.slice(0, 10)}…`,
+        message: `Reusing TokenOps vesting manager ${existingManager.slice(0, 10)}…`,
         meta: { manager: existingManager, cloakOpsCampaignId: input.cloakOpsCampaignId },
       });
       return {
@@ -133,6 +155,14 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
         createdAt: Date.now(),
         url: tokenOpsDashboardUrl(existingManager),
       };
+    }
+
+    if (existingManager) {
+      this.log({
+        level: "warn",
+        op: "createCampaign",
+        message: `Configured manager ${existingManager.slice(0, 10)}… is not a fhe-vesting manager — deploying a fresh one.`,
+      });
     }
 
     if (!walletClient || !account) {
@@ -256,7 +286,13 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       amount: BigInt(r.allocation),
     }));
 
-    const maxBatch = Number(await vestingClient.maxBatchSize());
+    let maxBatch = 1;
+    try {
+      maxBatch = Number(await vestingClient.maxBatchSize());
+    } catch {
+      // Older managers may not expose maxBatchSize — fall back to 1 per tx.
+      maxBatch = 1;
+    }
     const batchSize = Math.max(maxBatch, 1);
     let synced = 0;
 
