@@ -30,7 +30,6 @@ getStatus()
 createCampaign(input)
 syncRecipients(input)
 createDistributionOperation(input)
-getAnalytics(campaignId)
 ```
 
 ## The on-chain target: TokenOps confidential vesting factory
@@ -117,10 +116,10 @@ Vesting class → schedule mapping (`vesting-helpers.ts > buildVestingInitArgs`)
 | `0` | No cliff (start..end linear window) |
 | `n > 0` | `n × 30 days` cliff (capped below the duration) |
 
-### `createDistributionOperation` / `getAnalytics`
-Summary only — `createDistributionOperation` logs the stakeholder count;
-`getAnalytics` returns an empty rollup (per-wallet confidential balances are not
-read back).
+### `createDistributionOperation`
+Summary only — logs the stakeholder count once funding succeeds. Per-wallet
+confidential balances are not read back (they are decryptable only by each
+beneficiary via the Zama ACL).
 
 ## Prerequisites for a successful sync (honest)
 

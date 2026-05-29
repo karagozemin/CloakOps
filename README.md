@@ -135,7 +135,6 @@ ZAMA_RELAYER_URL=https://relayer.testnet.zama.org/v2
 | `CloakConfidentialToken` (cCLOAK) | `0x63E80Bb781638e604047bc98f405cA6d8058746c` |
 | TokenOps vesting factory | `0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a` |
 | TokenOps vesting token (CTestToken) | `0xFaac272CDE1701479932935a3567652873c377EF` |
-| TokenOps vesting schedule | [app.tokenops.xyz → schedule](https://app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be) |
 
 ---
 

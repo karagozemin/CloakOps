@@ -216,8 +216,8 @@ See [`.env.example`](../.env.example) for the full template.
 | --- | --- |
 | `ConfidentialCampaign` | `0x468d1Ab3bd52CbF43E4833A5696E47325De9C885` |
 | `CloakConfidentialToken` (cCLOAK) | `0x63E80Bb781638e604047bc98f405cA6d8058746c` |
-| TokenOps vesting contract | `0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494` |
-| TokenOps vesting schedule | [app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be](https://app.tokenops.xyz/contract/schedules/6a189b396f763543bff332be) |
+| TokenOps vesting factory | `0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a` |
+| TokenOps vesting token (CTestToken) | `0xFaac272CDE1701479932935a3567652873c377EF` |
 
 After redeploying contracts, run `npm run export-abi` and update
 `apps/web/.env.local` with the new addresses.
