@@ -147,13 +147,13 @@ export function resolveTokenOpsRelayerUrl(): string | undefined {
 }
 
 /**
- * Authorise a spender (factory/manager) to pull confidential tokens from the
- * admin wallet. Skips the tx (returns null) when the operator is already set —
- * the deadline is far in the future, so it only ever costs one signature.
+ * Authorise the vesting factory to pull confidential tokens from the admin
+ * wallet. Skips the tx (returns null) when the operator is already set — the
+ * deadline is far in the future, so it only ever costs one signature.
  */
 export async function ensureTokenOperator(
   token: Address,
-  manager: Address,
+  spender: Address,
   walletClient: WalletClient,
   publicClient: PublicClient,
   account: Address,
@@ -164,7 +164,7 @@ export async function ensureTokenOperator(
     address: token,
     abi: erc7984OperatorAbi,
     functionName: "isOperator",
-    args: [account, manager],
+    args: [account, spender],
   });
   if (alreadyOperator) return null;
 
@@ -172,7 +172,7 @@ export async function ensureTokenOperator(
     address: token,
     abi: erc7984OperatorAbi,
     functionName: "setOperator",
-    args: [manager, OPERATOR_DEADLINE],
+    args: [spender, OPERATOR_DEADLINE],
     account,
     chain: walletClient.chain,
   });

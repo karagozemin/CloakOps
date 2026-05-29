@@ -70,15 +70,10 @@ export function campaignTypeLabel(id: number): string {
 export const hasLiveContractAddressNote =
   "Not configured (set NEXT_PUBLIC_CLOAKOPS_CONTRACT_ADDRESS after deploy)";
 
-/** TokenOps x ZAMA vesting schedule deployed on Sepolia (tracking page + contract). */
+/** TokenOps x ZAMA vesting schedule deployed on Sepolia (dashboard tracking page). */
 export const TOKENOPS_VESTING_SCHEDULE_ID =
   process.env.NEXT_PUBLIC_TOKENOPS_VESTING_SCHEDULE_ID ??
   "6a189b396f763543bff332be";
-
-export const TOKENOPS_VESTING_CONTRACT =
-  envAddress(process.env.NEXT_PUBLIC_TOKENOPS_VESTING_CONTRACT) ||
-  envAddress("0xE1Fce9e572efFa42BBE851A44D2d00d2c808c494") ||
-  ("" as `0x${string}`);
 
 /**
  * TokenOps confidential vesting factory
@@ -92,8 +87,8 @@ export const TOKENOPS_VESTING_FACTORY =
   ("" as `0x${string}`);
 
 /**
- * ERC-7984 token the configured vesting manager accepts.
- * Must match the manager's immutable token (e.g. CTestToken on the linked schedule).
+ * ERC-7984 token the vesting factory pulls via confidentialTransferFrom
+ * (e.g. the CTestToken faucet on Sepolia).
  */
 export const TOKENOPS_VESTING_TOKEN = envAddress(
   process.env.NEXT_PUBLIC_TOKENOPS_VESTING_TOKEN,
@@ -124,26 +119,13 @@ export function tokenOpsVestingToken(
   );
 }
 
-/** TokenOps dashboard URL when the manager matches the configured schedule. */
-export function tokenOpsDashboardUrl(managerAddress: string): string | undefined {
-  const link = tokenOpsVestingLink();
-  if (
-    link &&
-    managerAddress.toLowerCase() === link.contract.toLowerCase()
-  ) {
-    return link.url;
-  }
-  return undefined;
-}
-
 /** Live TokenOps vesting rail link when schedule id is configured. */
 export function tokenOpsVestingLink():
-  | { id: string; url: string; contract: `0x${string}` }
+  | { id: string; url: string }
   | undefined {
   if (!TOKENOPS_VESTING_SCHEDULE_ID) return undefined;
   return {
     id: TOKENOPS_VESTING_SCHEDULE_ID,
     url: TOKENOPS_VESTING_SCHEDULE_URL,
-    contract: TOKENOPS_VESTING_CONTRACT,
   };
 }

@@ -1,7 +1,6 @@
 import {
   TOKENOPS_AUTO_MINT,
   TOKENOPS_VESTING_FACTORY,
-  tokenOpsDashboardUrl,
   tokenOpsVestingLink,
   tokenOpsVestingToken,
 } from "@/lib/config";
@@ -78,7 +77,6 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
       chainId: this.chainId,
       chainSupported,
       factoryAddress,
-      managerAddress: factoryAddress,
       message: chainSupported
         ? `TokenOps vesting factory ${factoryAddress!.slice(0, 10)}… on Sepolia.`
         : `No TokenOps vesting factory configured for chain ${this.chainId}.`,
@@ -117,10 +115,9 @@ export class RealTokenOpsAdapter implements TokenOpsCampaignAdapter {
 
     return {
       tokenOpsCampaignId: factory,
-      managerAddress: factory,
       status: "created",
       createdAt: Date.now(),
-      url: tokenOpsDashboardUrl(factory) ?? tokenOpsVestingLink()?.url,
+      url: tokenOpsVestingLink()?.url,
     };
   }
 

@@ -14,15 +14,13 @@ export type TokenOpsMode = "real";
 export interface TokenOpsStatus {
   mode: TokenOpsMode;
   connected: boolean;
-  /** Human label for the active provider, e.g. "@tokenops/sdk fhe-airdrop". */
+  /** Human label for the active provider. */
   provider: string;
   sdkVersion?: string;
   chainId: number;
   chainSupported: boolean;
-  /** Resolved on-chain confidential-vesting factory address (real mode). */
+  /** Resolved on-chain confidential-vesting factory address. */
   factoryAddress?: string;
-  /** Reused or deployed vesting manager address when known. */
-  managerAddress?: string;
   /** Short status message for the UI. */
   message: string;
   /** Round-trip latency in ms for the status probe. */
@@ -48,10 +46,7 @@ export interface CreateTokenOpsCampaignInput {
   recipientCount: number;
   /** Reference to the on-chain CloakOps campaign once it exists. */
   cloakOpsCampaignId?: string;
-  /**
-   * ERC-7984 token the vesting manager accepts. Defaults to `token` when
-   * deploying a new manager; must match the manager's token when reusing one.
-   */
+  /** ERC-7984 token the vesting factory pulls. Defaults to `token`. */
   vestingToken?: string;
   /** Wallet clients from the create flow (wagmi `useWalletClient` can lag behind `isConnected`). */
   onChain?: TokenOpsOnChainClients;
@@ -61,15 +56,13 @@ export interface TokenOpsCampaignResult {
   tokenOpsCampaignId: string;
   status: "created" | "draft" | "pending";
   createdAt: number;
-  /** On-chain vesting manager clone address. */
-  managerAddress?: string;
   /** Link into the TokenOps dashboard (when available). */
   url?: string;
   /** Tx hash when a real on-chain factory call was made. */
   txHash?: string;
 }
 
-/** Recipient row synced into TokenOps confidential vesting (amounts encrypted by SDK). */
+/** Recipient row synced into TokenOps confidential vesting (amounts encrypted client-side). */
 export interface TokenOpsRecipientEntry {
   wallet: string;
   allocation: number;
@@ -77,7 +70,7 @@ export interface TokenOpsRecipientEntry {
 }
 
 export interface SyncRecipientsInput {
-  /** Vesting manager clone address from {@link TokenOpsCampaignResult}. */
+  /** Vesting factory address from {@link TokenOpsCampaignResult}. */
   tokenOpsCampaignId: string;
   token: string;
   claimStart: number;

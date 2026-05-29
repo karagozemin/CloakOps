@@ -240,9 +240,7 @@ export async function runCreateCampaign(
     createdAt: Date.now(),
     txHash,
     tokenOpsCampaignId:
-      tokenOpsResult.tokenOpsCampaignId ??
-      tokenOpsResult.managerAddress ??
-      tokenOpsVestingLink()?.id,
+      tokenOpsResult.tokenOpsCampaignId ?? tokenOpsVestingLink()?.id,
     tokenOpsUrl: tokenOpsResult.url ?? tokenOpsVestingLink()?.url,
     notes: input.notes,
     source: "onchain",

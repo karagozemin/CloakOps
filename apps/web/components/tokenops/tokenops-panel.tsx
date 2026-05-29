@@ -70,13 +70,6 @@ export function TokenOpsPanel({ className }: { className?: string }) {
               </span>
             </Field>
           ) : null}
-          {status?.managerAddress ? (
-            <Field label="Manager">
-              <span className="mono text-xs text-cloak-fg">
-                {shortAddress(status.managerAddress, 5)}
-              </span>
-            </Field>
-          ) : null}
           {typeof status?.latencyMs === "number" ? (
             <Field label="Latency">
               <span className="mono text-xs text-cloak-fg">
