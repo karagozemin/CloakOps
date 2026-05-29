@@ -198,6 +198,12 @@ events above), which is exactly what the in-app link surfaces.
 > schedule row requires creating it through TokenOps' own "Add distribution" UI
 > (which writes to their backend); the on-chain factory integration here is the
 > trustless equivalent.
+>
+> CloakOps builds on the **factory + ERC-7984 direction Gedas confirmed**, and
+> extends it: the single-stakeholder cap is a limit of the *vesting UI*, not the
+> factory, so we call the factory **directly** and batch **many** stakeholders
+> through Multicall3 — a more complete integration than the minimal UI path,
+> while staying consistent with the contract's real capabilities.
 
 ## Environment variables
 
