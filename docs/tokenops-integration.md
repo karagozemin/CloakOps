@@ -147,14 +147,45 @@ log and fails the create flow.
 | Per-recipient decryption authorization | **Zama FHE ACL** (`FHE.allow`) |
 | Public budget, rules, claim window, claimed count | **CloakOps contract** (public state) |
 
+## Integration depth & data flow
+
+CloakOps is woven into the TokenOps vesting wallet, not bolted next to it. Of the
+three encrypted fields CloakOps stores per recipient, **two flow directly into the
+TokenOps clone**:
+
+```
+CloakOps ConfidentialCampaign (encrypted)        TokenOps vesting wallet (per recipient)
+  ├─ allocation amount  (euint64) ───────────▶  funded balance via batchFundVestingWalletConfidential
+  ├─ vesting class      (euint8)  ───────────▶  cliffSeconds in initArgs (class × 30 days)
+  └─ tier               (euint8)                 CloakOps-only metadata (does not affect the wallet)
+```
+
+- **Amount → funding.** The per-recipient `euint64` allocation is re-encrypted in
+  the browser bound to the factory (`encryptUint64Batch`) and funded into the
+  wallet. (FHE handles are contract-scoped, so re-encryption — not handle reuse —
+  is the correct cross-contract pattern.)
+- **Vesting class → schedule.** `buildVestingInitArgs` maps the vesting class to
+  the wallet's `cliffSeconds`, so the confidential vesting tier actually shapes the
+  on-chain release curve.
+- **SDK usage.** The confidential core runs on the TokenOps SDK
+  (`@tokenops/sdk/fhe` encryptor, `@tokenops/sdk/fhe-vesting` operator ABI); we
+  call the same on-chain factory the dashboard uses. The only thing we orchestrate
+  ourselves is multi-stakeholder batching — the dashboard UI funds one stakeholder
+  at a time, the factory does not have that limit.
+
 ## Privacy boundary at the TokenOps edge
 
 Per-recipient amounts that reach the factory are **encrypted in the browser**
 (`encryptUint64Batch`, bound to the factory + funder) before they touch the
 chain — the plaintext allocation never lands in public state, and the CloakOps
-`ConfidentialCampaign` ledger remains the canonical encrypted source. Recipient
-addresses and the schedule metadata (start/end, cliff) are visible, consistent
-with the "private allocations, public rules" model.
+`ConfidentialCampaign` ledger remains the canonical encrypted source.
+
+Recipient **addresses** and schedule metadata (start/end, cliff) stay visible —
+this is **parity with TokenOps' own confidential vesting**, where ERC-7984
+encrypts *amounts/balances*, not beneficiary addresses (a vesting wallet's
+beneficiary is necessarily on-chain so it can claim). CloakOps hides exactly what
+the confidential standard hides, consistent with the "private allocations, public
+rules" model.
 
 ## Verifiable on-chain proof
 
