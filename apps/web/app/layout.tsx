@@ -3,6 +3,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { AppBackground } from "@/components/backgrounds/app-background";
 
 export const metadata: Metadata = {
   title: "CloakOps — Confidential campaign layer for TokenOps",
@@ -47,7 +48,10 @@ export default function RootLayout({
         <Providers>
           <div className="flex min-h-screen flex-col">
             <SiteHeader />
-            <main className="flex-1">{children}</main>
+            <main className="relative flex-1">
+              <AppBackground />
+              {children}
+            </main>
             <SiteFooter />
           </div>
         </Providers>

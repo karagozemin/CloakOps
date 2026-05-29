@@ -3,6 +3,12 @@ import { Logo } from "@/components/brand/logo";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  HeroBackground,
+  PrivacyBackground,
+  SolutionBackground,
+  TrackBackground,
+} from "@/components/landing/landing-backgrounds";
+import {
   ArrowRight,
   Eye,
   EyeOff,
@@ -19,7 +25,7 @@ export default function LandingPage() {
     <div className="mx-auto max-w-7xl px-4 sm:px-6">
       {/* Hero */}
       <section className="relative overflow-hidden py-16 sm:py-24">
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-grid-faint [background-size:32px_32px] opacity-40" />
+        <HeroBackground />
         <div className="mx-auto max-w-3xl text-center">
           <div className="mb-6 flex justify-center">
             <Logo size="2xl" priority className="drop-shadow-glow" />
@@ -58,7 +64,8 @@ export default function LandingPage() {
       </section>
 
       {/* Privacy split */}
-      <section className="grid gap-4 pb-16 md:grid-cols-2">
+      <section className="relative grid gap-4 pb-16 md:grid-cols-2">
+        <PrivacyBackground />
         <Card>
           <CardBody>
             <div className="mb-3 flex items-center gap-2">
@@ -110,7 +117,8 @@ export default function LandingPage() {
       </section>
 
       {/* Problem / Solution */}
-      <section className="grid gap-6 pb-16 lg:grid-cols-2">
+      <section className="relative grid gap-6 pb-16 lg:grid-cols-2">
+        <SolutionBackground />
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
             Public chains leak distribution strategy
@@ -185,8 +193,9 @@ export default function LandingPage() {
       </section>
 
       {/* Track fit */}
-      <section className="pb-24">
-        <Card className="overflow-hidden">
+      <section className="relative pb-24">
+        <TrackBackground />
+        <Card className="relative overflow-hidden">
           <CardBody className="sm:p-8">
             <div className="grid gap-8 md:grid-cols-2">
               <div>
