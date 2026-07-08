@@ -182,10 +182,15 @@ describe("ConfidentialCampaign", () => {
       await addRecipient(id, alice.address, 25_000, 2, 1);
 
       const encAmount = await campaign.getEncryptedAllocation(id, alice.address);
-      // Bob is not on the FHE ACL for Alice's handle.
-      await expect(
-        fhevm.userDecryptEuint(FhevmType.euint64, encAmount, contractAddress, bob),
-      ).to.be.rejected;
+      // Bob is not on the FHE ACL for Alice's handle, so the decrypt must throw.
+      let denied = false;
+      try {
+        await fhevm.userDecryptEuint(FhevmType.euint64, encAmount, contractAddress, bob);
+      } catch {
+        denied = true;
+      }
+      expect(denied).to.eq(true);
+
     });
 
     it("batch-adds multiple recipients under one proof", async () => {

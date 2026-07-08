@@ -30,7 +30,16 @@
 import { ethers, network } from "hardhat";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { createInstance, SepoliaConfig } from "@zama-fhe/relayer-sdk/node";
+
+// The relayer SDK ships as ESM-only. This file runs under ts-node as CommonJS
+// (hardhat), so we load the SDK lazily via a runtime dynamic import() — which
+// node16 preserves as a real ESM import — instead of a static CJS `require`.
+type FheInstance = Awaited<
+  ReturnType<
+    (typeof import("@zama-fhe/relayer-sdk/node", { with: { "resolution-mode": "import" } }))["createInstance"]
+  >
+>;
+
 
 const AMOUNT = 25_000n;
 const TIER = 3; // tier 3 -> +10% encrypted bonus band (proves real FHE compute)
@@ -77,7 +86,9 @@ async function main() {
   console.log("[1/6] Initialising Zama relayer SDK (Sepolia config)...");
   const rpcUrl =
     process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com";
+  const { createInstance, SepoliaConfig } = await import("@zama-fhe/relayer-sdk/node");
   const fhe = await createInstance({ ...SepoliaConfig, network: rpcUrl });
+
   console.log("      relayer instance ready.\n");
 
 
@@ -185,8 +196,9 @@ async function main() {
 }
 
 async function userDecrypt(
-  fhe: Awaited<ReturnType<typeof createInstance>>,
+  fhe: FheInstance,
   signer: any,
+
   contractAddress: string,
   handle: string,
 ): Promise<bigint> {
