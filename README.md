@@ -19,7 +19,7 @@ verifiable**.
 | --- | --- |
 | **Live demo** | [cloak-ops.vercel.app](https://cloak-ops.vercel.app/) |
 | **Video demo** | _Add your Loom / YouTube URL_ |
-| **ConfidentialCampaign (Sepolia)** | [`0x2aC7…03e4`](https://sepolia.etherscan.io/address/0x2aC73986D461421A13DAC1A113EfE1A6e1F003e4) |
+| **ConfidentialCampaign (Sepolia)** | [`0x8bE1…aF7e`](https://sepolia.etherscan.io/address/0x8bE1695FEa146cBb84d292d68f7682D118a0aF7e) |
 | **TokenOps funding (example tx)** | [`0x3de4…2cd9e`](https://sepolia.etherscan.io/tx/0x3de4905d8b5dcd3cfada7d51ddffecf54710c07fe1c6661ddc4e1bac1ef2cd9e) |
 
 Full submission pack (pitch, demo order, checklist): [`docs/SUBMISSION.md`](docs/SUBMISSION.md).
@@ -150,7 +150,7 @@ Configure the frontend env first — copy [`.env.example`](.env.example) to
 
 ```bash
 npm run compile      # Solidity 0.8.27, cancun, viaIR
-npm run test         # 13 FHEVM mock-mode tests
+npm run test         # 20 FHEVM mock-mode tests
 ```
 
 ### Deploy to Sepolia
@@ -177,8 +177,8 @@ ZAMA_RELAYER_URL=https://relayer.testnet.zama.org/v2
 
 | Component | Address / link |
 | --- | --- |
-| `ConfidentialCampaign` | `0x2aC73986D461421A13DAC1A113EfE1A6e1F003e4` |
-| `CloakConfidentialToken` (cCLOAK) | `0xdba250e6E6b7e6CC79C673eb565Be2ef4D7493E9` |
+| `ConfidentialCampaign` | `0x8bE1695FEa146cBb84d292d68f7682D118a0aF7e` |
+| `CloakConfidentialToken` (cCLOAK) | `0x83e62cB81240dc73d7d3e2d812E5559EA0435376` |
 | TokenOps vesting factory | `0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a` |
 | TokenOps vesting token (CTestToken) | `0xFaac272CDE1701479932935a3567652873c377EF` |
 

@@ -92,7 +92,7 @@ CloakOps/
 │   ├── contracts/
 │   │   ├── ConfidentialCampaign.sol
 │   │   └── CloakConfidentialToken.sol
-│   ├── test/                    FHEVM mock-mode tests (13 passing)
+│   ├── test/                    FHEVM mock-mode tests (20 passing)
 │   └── scripts/                 deploy.ts, export-abi.ts
 └── docs/                        architecture, privacy-model, tokenops-integration, …
 ```
@@ -214,8 +214,8 @@ See [`.env.example`](../.env.example) for the full template.
 
 | Component | Address |
 | --- | --- |
-| `ConfidentialCampaign` | `0x2aC73986D461421A13DAC1A113EfE1A6e1F003e4` |
-| `CloakConfidentialToken` (cCLOAK) | `0xdba250e6E6b7e6CC79C673eb565Be2ef4D7493E9` |
+| `ConfidentialCampaign` | `0x8bE1695FEa146cBb84d292d68f7682D118a0aF7e` |
+| `CloakConfidentialToken` (cCLOAK) | `0x83e62cB81240dc73d7d3e2d812E5559EA0435376` |
 | TokenOps vesting factory | `0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a` |
 | TokenOps vesting token (CTestToken) | `0xFaac272CDE1701479932935a3567652873c377EF` |
 
