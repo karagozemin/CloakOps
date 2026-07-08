@@ -181,8 +181,8 @@ export default function PublicAuditPage() {
             subtitle="Addresses are visible; allocations stay encrypted"
           />
           <CardBody>
-            <div className="overflow-hidden rounded-lg border border-cloak-line">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto rounded-lg border border-cloak-line">
+              <table className="w-full min-w-[420px] text-left text-xs">
                 <thead className="bg-ink-800 text-cloak-muted">
                   <tr>
                     <th className="px-3 py-2 font-medium">#</th>

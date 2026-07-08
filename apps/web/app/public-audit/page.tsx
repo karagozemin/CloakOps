@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
+import { ErrorNotice } from "@/components/ui/error-notice";
 import { useAllCampaigns } from "@/lib/campaigns/onchain";
 import { campaignTypeLabel } from "@/lib/config";
 import { formatNumber } from "@/lib/utils";
@@ -35,7 +36,8 @@ export default function PublicAuditIndexPage() {
         }
       />
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-4">
+        {error && campaigns.length > 0 ? <ErrorNotice error={error} /> : null}
         {loading && campaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-cloak-line bg-ink-900/40 px-6 py-12 text-center">
             <Loader2 className="mb-3 h-7 w-7 animate-spin text-gold" />

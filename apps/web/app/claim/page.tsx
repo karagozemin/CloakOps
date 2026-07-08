@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
 import { EncryptedField } from "@/components/campaign/encrypted-field";
 import { ConnectButton } from "@/components/connect-button";
+import { ErrorNotice, WrongNetworkBanner } from "@/components/ui/error-notice";
 import { useCampaigns } from "@/lib/campaigns/hooks";
 import { campaignStore } from "@/lib/campaigns/store";
 import type { CampaignRecord, RecipientRecord } from "@/lib/campaigns/types";
@@ -172,6 +173,7 @@ export default function ClaimPage() {
         </div>
       ) : (
         <div className="mt-8 space-y-6">
+          <WrongNetworkBanner />
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-cloak-muted">
               {scanning
@@ -190,9 +192,7 @@ export default function ClaimPage() {
             </button>
           </div>
 
-          {scanError ? (
-            <p className="text-xs text-cloak-danger">{scanError}</p>
-          ) : null}
+          {scanError ? <ErrorNotice error={scanError} /> : null}
 
           {scanning && allocations.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-cloak-line bg-ink-900/40 px-6 py-12 text-center">
@@ -252,6 +252,7 @@ function AllocationCard({
 }) {
   const [claimed, setClaimed] = useState(recipient.claimed);
   const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<unknown>(null);
   const [handles, setHandles] = useState({
     amount: recipient.amountHandle,
     tier: recipient.tierHandle,
@@ -318,6 +319,7 @@ function AllocationCard({
   async function handleClaim() {
     if (!publicClient || !campaign.onChainId) return;
     setClaiming(true);
+    setClaimError(null);
     try {
       const clients = await resolveOnChainClients(
         address as `0x${string}`,
@@ -333,6 +335,8 @@ function AllocationCard({
       setClaimed(true);
       // Give the relayer a moment, then load the freshly credited balance.
       setTimeout(loadBalance, 1500);
+    } catch (err) {
+      setClaimError(err);
     } finally {
       setClaiming(false);
     }
@@ -410,6 +414,8 @@ function AllocationCard({
             />
           </div>
         ) : null}
+
+        {claimError ? <ErrorNotice error={claimError} context="tx" /> : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-cloak-line pt-4">
           <div className="flex items-center gap-2 text-xs text-cloak-muted">

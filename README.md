@@ -144,6 +144,11 @@ Configure the frontend env first — copy [`.env.example`](.env.example) to
    Sepolia (works in incognito — no localStorage required) and verify public
    rules while private fields stay encrypted.
 
+> **Wrong network / failed txs?** Each page surfaces a human-readable notice: a
+> **wrong-network banner** prompts a one-click switch to Sepolia, and reverted or
+> rejected transactions decode into a plain-language `ErrorNotice` instead of a
+> raw RPC dump.
+
 ---
 
 ## Contracts

@@ -12,6 +12,7 @@ import { CsvEditor } from "@/components/admin/csv-editor";
 import { RecipientBuilder } from "@/components/admin/recipient-builder";
 import { BudgetChecksum } from "@/components/admin/budget-checksum";
 import { SignatureSavings } from "@/components/admin/signature-savings";
+import { ErrorNotice, WrongNetworkBanner } from "@/components/ui/error-notice";
 
 import { useZama } from "@/lib/zama";
 import { useTokenOps } from "@/lib/tokenops/context";
@@ -248,6 +249,8 @@ export default function AdminPage() {
           </button>
         }
       />
+
+      <WrongNetworkBanner className="mt-4" />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Left: form + CSV + recipients */}
@@ -514,9 +517,7 @@ export default function AdminPage() {
                 ) : null,
               )}
 
-              {formError ? (
-                <p className="text-xs text-cloak-danger">{formError}</p>
-              ) : null}
+              {formError ? <ErrorNotice error={formError} context="tx" /> : null}
 
               {created ? (
                 <div className="flex flex-wrap items-center gap-3 rounded-lg border border-cloak-ok/30 bg-cloak-ok/10 p-3">
