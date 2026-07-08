@@ -145,6 +145,38 @@ export default function PublicAuditPage() {
 
         <Card>
           <CardHeader
+            title="Confidential payout rule"
+            icon={<ShieldCheck className="h-4 w-4" />}
+            subtitle="A public rule the contract enforces on every claim — over encrypted data"
+          />
+          <CardBody className="space-y-3">
+            <p className="text-sm leading-relaxed text-cloak-muted">
+              On <span className="text-cloak-fg">claim()</span>, the contract adds a
+              tier-based loyalty bonus to each recipient&apos;s payout, computed
+              entirely under FHE. The bonus bands are public and identical for
+              everyone, but each recipient&apos;s tier stays encrypted — so nobody,
+              not even the admin, learns which band a given wallet falls into.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {[
+                { band: "Tier ≥ 5", bonus: "+25%" },
+                { band: "Tier ≥ 3", bonus: "+10%" },
+                { band: "Otherwise", bonus: "+0%" },
+              ].map((b) => (
+                <div
+                  key={b.band}
+                  className="flex items-center justify-between rounded-md border border-cloak-line/60 bg-ink-900/60 px-3 py-2 text-xs"
+                >
+                  <span className="text-cloak-muted">{b.band}</span>
+                  <span className="text-gold">{b.bonus}</span>
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
             title="Recipients ledger"
             subtitle="Addresses are visible; allocations stay encrypted"
           />

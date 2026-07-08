@@ -392,6 +392,14 @@ function AllocationCard({
               an on-chain <span className="text-cloak-fg">FHE.add</span>. The payout
               amount stays encrypted — only you can decrypt it.
             </div>
+            <p className="px-1 text-[11px] leading-relaxed text-cloak-muted">
+              Your credited balance may exceed your base allocation: the contract
+              applies a{" "}
+              <span className="text-cloak-fg">tier-based loyalty bonus</span>{" "}
+              computed entirely under FHE (tier&nbsp;≥&nbsp;5 → +25%,
+              tier&nbsp;≥&nbsp;3 → +10%). Your tier stays encrypted, so nobody —
+              not even the admin — learns which band you fall into.
+            </p>
             <EncryptedField
               label="Confidential token balance"
               handle={balanceHandle}
