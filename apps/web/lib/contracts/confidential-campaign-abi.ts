@@ -132,6 +132,31 @@ export const confidentialCampaignAbi = [
         "internalType": "address",
         "name": "recipient",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "credited",
+        "type": "bool"
+      }
+    ],
+    "name": "PayoutSettled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
       }
     ],
     "name": "RecipientAdded",

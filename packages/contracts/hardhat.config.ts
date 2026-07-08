@@ -2,7 +2,9 @@ import { config as dotenvConfig } from "dotenv";
 import { resolve } from "path";
 
 import "@fhevm/hardhat-plugin";
+import "@nomicfoundation/hardhat-verify";
 import "@nomicfoundation/hardhat-ethers";
+
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomicfoundation/hardhat-network-helpers";
 import "@typechain/hardhat";

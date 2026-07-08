@@ -12,8 +12,8 @@ Fill in the video URL when ready; live demo is deployed.
 | **Live demo** | [https://cloak-ops.vercel.app/](https://cloak-ops.vercel.app/) |
 | **Video demo** | _← add your Loom / YouTube URL_ |
 | **GitHub** | Repository root |
-| **ConfidentialCampaign (Sepolia)** | [0x468d1Ab3…C885](https://sepolia.etherscan.io/address/0x468d1Ab3bd52CbF43E4833A5696E47325De9C885) |
-| **CloakConfidentialToken (Sepolia)** | [0x63E80Bb7…746c](https://sepolia.etherscan.io/address/0x63E80Bb781638e604047bc98f405cA6d8058746c) |
+| **ConfidentialCampaign (Sepolia)** | [0x2aC73986…03e4](https://sepolia.etherscan.io/address/0x2aC73986D461421A13DAC1A113EfE1A6e1F003e4) |
+| **CloakConfidentialToken (Sepolia)** | [0xdba250e6…93E9](https://sepolia.etherscan.io/address/0xdba250e6E6b7e6CC79C673eb565Be2ef4D7493E9) |
 | **TokenOps vesting factory** | [0x98c519f9…b72a](https://sepolia.etherscan.io/address/0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a) |
 | **Example TokenOps funding tx** | [0x3de4905d…2cd9e](https://sepolia.etherscan.io/tx/0x3de4905d8b5dcd3cfada7d51ddffecf54710c07fe1c6661ddc4e1bac1ef2cd9e) |
 

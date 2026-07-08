@@ -39,6 +39,10 @@ describe("ConfidentialCampaign", () => {
     campaign = (await Campaign.deploy()) as unknown as ConfidentialCampaign;
     await campaign.waitForDeployment();
     contractAddress = await campaign.getAddress();
+
+    // Authorize the campaign as a distributor so it can credit confidential
+    // balances on claim (mirrors the deploy script).
+    await (await token.setDistributor(contractAddress, true)).wait();
   });
 
   async function createCampaign(opts?: { start?: number; end?: number }) {
@@ -253,7 +257,63 @@ describe("ConfidentialCampaign", () => {
       expect(clearBalance).to.eq(25_000n);
     });
 
+    it("applies a +10% encrypted tier bonus for tier 3 (25000 -> 27500)", async () => {
+      const id = await createCampaign();
+      // tier 3 falls in the [3,5) band -> +10% under FHE.
+      await addRecipient(id, alice.address, 25_000, 3, 1);
+
+      await (await campaign.connect(alice).claim(id)).wait();
+
+      const tokenAddress = await token.getAddress();
+      const encBalance = await token.confidentialBalanceOf(alice.address);
+      const clearBalance = await fhevm.userDecryptEuint(
+        FhevmType.euint64,
+        encBalance,
+        tokenAddress,
+        alice,
+      );
+      // 25000 + 25000/10 = 27500. Output != input proves a real FHE compute.
+      expect(clearBalance).to.eq(27_500n);
+    });
+
+    it("applies a +25% encrypted tier bonus for tier 5 (25000 -> 31250)", async () => {
+      const id = await createCampaign();
+      // tier 5 falls in the [5,inf) band -> +25% under FHE.
+      await addRecipient(id, alice.address, 25_000, 5, 1);
+
+      await (await campaign.connect(alice).claim(id)).wait();
+
+      const tokenAddress = await token.getAddress();
+      const encBalance = await token.confidentialBalanceOf(alice.address);
+      const clearBalance = await fhevm.userDecryptEuint(
+        FhevmType.euint64,
+        encBalance,
+        tokenAddress,
+        alice,
+      );
+      // 25000 + 25000/4 = 31250.
+      expect(clearBalance).to.eq(31_250n);
+    });
+
+    it("applies no bonus below tier 3 (bob tier 2, 150000 -> 150000)", async () => {
+      const id = await createCampaign();
+      await addRecipient(id, bob.address, 150_000, 2, 3);
+
+      await (await campaign.connect(bob).claim(id)).wait();
+
+      const tokenAddress = await token.getAddress();
+      const encBalance = await token.confidentialBalanceOf(bob.address);
+      const clearBalance = await fhevm.userDecryptEuint(
+        FhevmType.euint64,
+        encBalance,
+        tokenAddress,
+        bob,
+      );
+      expect(clearBalance).to.eq(150_000n);
+    });
+
     it("rejects claims from non-eligible accounts", async () => {
+
       const id = await createCampaign();
       await expect(campaign.connect(mallory).claim(id)).to.be.revertedWithCustomError(
         campaign,
@@ -280,5 +340,49 @@ describe("ConfidentialCampaign", () => {
         "ClaimWindowNotOpen",
       );
     });
+
+    it("emits PayoutSettled(credited=true) when crediting a confidential token", async () => {
+      const id = await createCampaign();
+      await addRecipient(id, alice.address, 25_000, 2, 1);
+
+      await expect(campaign.connect(alice).claim(id))
+        .to.emit(campaign, "PayoutSettled")
+        .withArgs(id, alice.address, true);
+    });
+  });
+
+  describe("distributor authorization", () => {
+    it("blocks non-distributor callers from crediting", async () => {
+      // A direct external call from a non-distributor account must revert.
+      const encBefore = await token.confidentialBalanceOf(alice.address);
+      // mallory is not a distributor; crediting must be gated.
+      await expect(
+        token.connect(mallory).creditConfidential(alice.address, encBefore),
+      ).to.be.revertedWithCustomError(token, "NotDistributor");
+    });
+
+    it("only the owner can set a distributor", async () => {
+      // Use staticCall to surface the custom error cleanly under the FHEVM mock.
+      await expect(
+        token.connect(mallory).setDistributor.staticCall(mallory.address, true),
+      ).to.be.revertedWithCustomError(token, "NotOwner");
+    });
+
+    it("emits PayoutSettled(credited=false) when the campaign is not an authorized distributor", async () => {
+      // Revoke the campaign's distributor rights: the claim still succeeds but
+      // the confidential credit is skipped and surfaced via the event.
+      await (await token.setDistributor(contractAddress, false)).wait();
+
+      const id = await createCampaign();
+      await addRecipient(id, alice.address, 25_000, 2, 1);
+
+      await expect(campaign.connect(alice).claim(id))
+        .to.emit(campaign, "PayoutSettled")
+        .withArgs(id, alice.address, false);
+
+      // Claim status is still recorded.
+      expect(await campaign.hasClaimed(id, alice.address)).to.eq(true);
+    });
   });
 });
+

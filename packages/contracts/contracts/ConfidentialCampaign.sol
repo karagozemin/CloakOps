@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import {FHE, euint64, euint8, externalEuint64, externalEuint8} from "@fhevm/solidity/lib/FHE.sol";
+import {FHE, euint64, euint8, ebool, externalEuint64, externalEuint8} from "@fhevm/solidity/lib/FHE.sol";
 import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 
 interface ICloakConfidentialToken {
@@ -84,6 +84,10 @@ contract ConfidentialCampaign is ZamaEthereumConfig {
     );
     event RecipientAdded(uint256 indexed campaignId, address indexed recipient);
     event Claimed(uint256 indexed campaignId, address indexed recipient);
+    /// @dev Signals whether the confidential on-chain payout was credited.
+    ///      `credited=false` means the campaign token is not a confidential
+    ///      token (status-only claim) — the claim itself still succeeded.
+    event PayoutSettled(uint256 indexed campaignId, address indexed recipient, bool credited);
 
     error CampaignDoesNotExist(uint256 campaignId);
     error NotCampaignAdmin(uint256 campaignId);
@@ -238,18 +242,60 @@ contract ConfidentialCampaign is ZamaEthereumConfig {
         alloc.claimed = true;
         c.claimedCount += 1;
 
+        // Confidential payout computed homomorphically. Two encrypted branches
+        // run here and NEITHER the amount nor the tier is ever revealed on-chain:
+        //
+        //   1. Zero-gate (privacy): a zero / uninitialised allocation pays out
+        //      zero, without revealing which recipients that applies to.
+        //   2. Tier-based loyalty bonus, computed entirely under FHE:
+        //         tier >= 5  -> +25% bonus
+        //         tier >= 3  -> +10% bonus
+        //         otherwise  -> no bonus
+        //      The tier stays encrypted, so nobody (not even the admin) can tell
+        //      which band a recipient falls into — yet the contract still credits
+        //      the correct, larger amount. This is a real FHE compute, not a
+        //      pass-through of the stored handle.
+        ebool hasAllocation = FHE.gt(alloc.amount, FHE.asEuint64(0));
+        euint64 baseAmount = FHE.select(hasAllocation, alloc.amount, FHE.asEuint64(0));
+
+        // Scalar (plaintext-divisor) division is supported under FHE and keeps
+        // the operand encrypted: bonus10 = base/10 (+10%), bonus25 = base/4 (+25%).
+        euint64 bonus10 = FHE.div(baseAmount, 10);
+        euint64 bonus25 = FHE.div(baseAmount, 4);
+
+        ebool tier3plus = FHE.ge(alloc.tier, FHE.asEuint8(3));
+        ebool tier5plus = FHE.ge(alloc.tier, FHE.asEuint8(5));
+
+        // Nested encrypted select: pick the bonus band under FHE, then add it.
+        euint64 bonus = FHE.select(
+            tier5plus,
+            bonus25,
+            FHE.select(tier3plus, bonus10, FHE.asEuint64(0))
+        );
+        euint64 payout = FHE.add(baseAmount, bonus);
+
+        FHE.allowThis(payout);
+        FHE.allow(payout, msg.sender);
+
+
+        emit Claimed(campaignId, msg.sender);
+
         // Confidential payout: grant the token transient access to the encrypted
-        // allocation, then credit the recipient's confidential balance on-chain.
+        // payout, then credit the recipient's confidential balance on-chain.
+        bool credited = false;
         if (c.token != address(0)) {
-            FHE.allowTransient(alloc.amount, c.token);
-            try ICloakConfidentialToken(c.token).creditConfidential(msg.sender, alloc.amount) {
-                // credited
+            FHE.allowTransient(payout, c.token);
+            try ICloakConfidentialToken(c.token).creditConfidential(msg.sender, payout) {
+                credited = true;
             } catch {
-                // Non-confidential token address: status-only claim.
+                // Non-confidential token address: status-only claim. The claim
+                // succeeds; the PayoutSettled event surfaces credited=false so
+                // the failure is observable rather than silently swallowed.
+                credited = false;
             }
         }
 
-        emit Claimed(campaignId, msg.sender);
+        emit PayoutSettled(campaignId, msg.sender, credited);
     }
 
     // ---------------------------------------------------------------------

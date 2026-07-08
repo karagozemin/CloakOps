@@ -32,6 +32,12 @@ async function main() {
   const campaignAddress = await campaign.getAddress();
   console.log(`ConfidentialCampaign deployed:   ${campaignAddress}`);
 
+  // Authorize the campaign contract as a confidential-token distributor so it
+  // can credit encrypted balances on claim().
+  const authTx = await token.setDistributor(campaignAddress, true);
+  await authTx.wait();
+  console.log(`Campaign authorized as distributor on token.`);
+
   const record = {
     network: network.name,
     chainId: Number(net.chainId),

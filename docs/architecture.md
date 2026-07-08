@@ -214,8 +214,8 @@ See [`.env.example`](../.env.example) for the full template.
 
 | Component | Address |
 | --- | --- |
-| `ConfidentialCampaign` | `0x468d1Ab3bd52CbF43E4833A5696E47325De9C885` |
-| `CloakConfidentialToken` (cCLOAK) | `0x63E80Bb781638e604047bc98f405cA6d8058746c` |
+| `ConfidentialCampaign` | `0x2aC73986D461421A13DAC1A113EfE1A6e1F003e4` |
+| `CloakConfidentialToken` (cCLOAK) | `0xdba250e6E6b7e6CC79C673eb565Be2ef4D7493E9` |
 | TokenOps vesting factory | `0x98c519f9de1dc8c8cb3eb9b0b09b3ce057beb72a` |
 | TokenOps vesting token (CTestToken) | `0xFaac272CDE1701479932935a3567652873c377EF` |
 
