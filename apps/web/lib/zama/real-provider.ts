@@ -87,11 +87,9 @@ export class RealZamaProvider implements ZamaProvider {
       return {
         mode: "real",
         ready: false,
-        message:
-          err instanceof Error
-            ? `Relayer not ready: ${err.message}`
-            : "Relayer not ready.",
+        message: `Relayer not ready: ${describeError(err)}`,
       };
+
     }
   }
 
@@ -147,10 +145,10 @@ export class RealZamaProvider implements ZamaProvider {
       }
     }
 
-    const detail =
-      lastError instanceof Error ? lastError.message : String(lastError);
+    const detail = describeError(lastError);
     throw new Error(`Failed to initialize FHE worker: ${detail}`);
   }
+
 
   async encryptBatch(
     contractAddress: string,
@@ -176,11 +174,12 @@ export class RealZamaProvider implements ZamaProvider {
         values,
       });
     } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
+      const detail = describeError(err);
       throw new Error(
         `Zama FHE encrypt failed: ${detail}. Try Chrome without extensions or hard refresh (Cmd+Shift+R).`,
       );
     }
+
 
     const handles = result.handles;
     const encryptedRecipients = recipients.map((r, i) => ({
@@ -242,7 +241,36 @@ export class RealZamaProvider implements ZamaProvider {
   }
 }
 
+/**
+ * Unwraps the full error chain. The Zama SDK often throws a generic
+ * "Failed to initialize FHE worker" while stashing the actual reason
+ * (CORS/network/WASM) in `error.cause`, so we surface every layer.
+ */
+function describeError(err: unknown): string {
+  const parts: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    if (current instanceof Error) {
+      parts.push(current.message || current.name);
+      current = (current as { cause?: unknown }).cause;
+    } else if (typeof current === "string") {
+      parts.push(current);
+      break;
+    } else {
+      parts.push(String(current));
+      break;
+    }
+  }
+
+  const unique = parts.filter((p, i) => p && parts.indexOf(p) === i);
+  return unique.length ? unique.join(" → ") : "Unknown error";
+}
+
 function toHex(bytes: Uint8Array): string {
+
   return (
     "0x" +
     Array.from(bytes)
