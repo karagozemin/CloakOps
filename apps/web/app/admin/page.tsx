@@ -11,6 +11,8 @@ import { TokenOpsPanel } from "@/components/tokenops/tokenops-panel";
 import { CsvEditor } from "@/components/admin/csv-editor";
 import { RecipientBuilder } from "@/components/admin/recipient-builder";
 import { BudgetChecksum } from "@/components/admin/budget-checksum";
+import { SignatureSavings } from "@/components/admin/signature-savings";
+
 import { useZama } from "@/lib/zama";
 import { useTokenOps } from "@/lib/tokenops/context";
 import { parseAllocationCsv, type CsvParseResult } from "@/lib/csv/parse";
@@ -46,12 +48,38 @@ import {
 } from "lucide-react";
 
 const STEPS = [
-  { key: "parse", label: "CSV parsed & validated" },
-  { key: "encrypt", label: "Zama FHE encryption" },
-  { key: "submit", label: "Confidential contract submission" },
-  { key: "tokenops", label: "TokenOps campaign synced" },
-  { key: "ready", label: "Campaign ready" },
+  {
+    key: "parse",
+    label: "CSV parsed & validated",
+    description:
+      "We read your recipients, check every address, and sum allocations against the public budget — no signature needed.",
+  },
+  {
+    key: "encrypt",
+    label: "Zama FHE encryption",
+    description:
+      "Each amount, tier, and vesting class is encrypted in your browser. Signature 1 authorizes the encrypted batch.",
+  },
+  {
+    key: "submit",
+    label: "Confidential contract submission",
+    description:
+      "All recipients are written on-chain in one Multicall3 batch. Signature 2 sends it — that's the last signature, no matter the list size.",
+  },
+  {
+    key: "tokenops",
+    label: "TokenOps campaign synced",
+    description:
+      "Encrypted allocations flow into TokenOps vesting wallets automatically — no extra clicks from you.",
+  },
+  {
+    key: "ready",
+    label: "Campaign ready",
+    description:
+      "Recipients can claim privately and anyone can verify the public rules on the audit page.",
+  },
 ];
+
 
 function defaultLocalDateTime(offsetDays = 0): string {
   const d = new Date(Date.now() + offsetDays * 86400_000);
@@ -415,7 +443,13 @@ export default function AdminPage() {
                       recipientCount={parseResult.recipients.length}
                     />
                   ) : null}
+                  {parseResult ? (
+                    <SignatureSavings
+                      recipientCount={parseResult.recipients.length}
+                    />
+                  ) : null}
                 </>
+
               ) : (
                 <>
                   <CsvEditor
@@ -593,6 +627,9 @@ function RecipientsPreview({
           </span>
         </div>
       )}
+
+      <SignatureSavings recipientCount={result.recipients.length} />
+
 
       {result.recipients.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-cloak-line">

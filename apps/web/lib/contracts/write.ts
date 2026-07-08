@@ -1,6 +1,8 @@
 import type { Address, Hash, PublicClient, WalletClient } from "viem";
 import { waitForTransactionReceipt } from "viem/actions";
+import { sepolia } from "viem/chains";
 import { getContractConfig } from "@/lib/contracts";
+
 
 export interface CreateOnChainCampaignInput {
   name: string;
@@ -47,8 +49,9 @@ export async function createCampaignOnChain(
       input.token,
     ],
     account,
-    chain: walletClient.chain,
+    chain: walletClient.chain ?? sepolia,
   });
+
 
   const receipt = await waitForTransactionReceipt(publicClient, { hash });
   if (receipt.status !== "success") {
@@ -82,8 +85,9 @@ export async function batchAddRecipientsOnChain(
       input.inputProof,
     ],
     account,
-    chain: walletClient.chain,
+    chain: walletClient.chain ?? sepolia,
   });
+
 
   const receipt = await waitForTransactionReceipt(publicClient, { hash });
   if (receipt.status !== "success") {
@@ -104,8 +108,9 @@ export async function claimOnChain(
     functionName: "claim",
     args: [campaignId],
     account,
-    chain: walletClient.chain,
+    chain: walletClient.chain ?? sepolia,
   });
+
   const receipt = await waitForTransactionReceipt(publicClient, { hash });
   if (receipt.status !== "success") {
     throw new Error("claim transaction reverted.");
