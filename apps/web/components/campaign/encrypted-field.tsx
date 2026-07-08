@@ -1,8 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Lock, LockOpen, Loader2, TriangleAlert } from "lucide-react";
 import { cn, shortAddress } from "@/lib/utils";
+
+const SCRAMBLE_GLYPHS = "0123456789•#*$%";
+
+/**
+ * RevealValue — the "delight" moment. When an encrypted field is decrypted,
+ * the ciphertext masking (`•••••`) resolves into the real value with a
+ * left-to-right scramble that locks each character into place. This makes the
+ * act of decryption feel tangible instead of the value just snapping in.
+ */
+function RevealValue({ text }: { text: string }) {
+  const [display, setDisplay] = useState(() =>
+    text.replace(/[^\s]/g, "•"),
+  );
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const chars = text.split("");
+    const totalFrames = Math.max(14, chars.length * 2);
+    let frame = 0;
+
+    function tick() {
+      // Each character "locks in" progressively from left to right.
+      const lockedCount = Math.floor((frame / totalFrames) * chars.length);
+      const next = chars
+        .map((ch, i) => {
+          if (ch === " " || ch === "," || ch === ".") return ch;
+          if (i < lockedCount) return ch;
+          return SCRAMBLE_GLYPHS[
+            Math.floor(Math.random() * SCRAMBLE_GLYPHS.length)
+          ];
+        })
+        .join("");
+      setDisplay(next);
+
+      frame += 1;
+      if (frame <= totalFrames) {
+        frameRef.current = window.setTimeout(
+          () => requestAnimationFrame(tick),
+          32,
+        );
+      } else {
+        setDisplay(text);
+      }
+    }
+
+    frameRef.current = window.setTimeout(
+      () => requestAnimationFrame(tick),
+      0,
+    );
+
+    return () => {
+      if (frameRef.current) window.clearTimeout(frameRef.current);
+    };
+  }, [text]);
+
+  return (
+    <span className="mono tabular-nums transition-colors">{display}</span>
+  );
+}
+
 
 export function EncryptedField({
   label,
@@ -50,10 +110,11 @@ export function EncryptedField({
       </div>
 
       {state === "open" && value !== null ? (
-        <p className="mt-2 text-xl font-semibold tracking-tight text-cloak-fg">
-          {format ? format(value) : value.toString()}
+        <p className="mt-2 text-xl font-semibold tracking-tight text-cloak-ok">
+          <RevealValue text={format ? format(value) : value.toString()} />
         </p>
       ) : (
+
         <p
           className="mono mt-2 truncate text-sm text-cloak-faint"
           title={handle}

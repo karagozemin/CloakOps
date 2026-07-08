@@ -28,7 +28,13 @@ import {
   CLOAKOPS_TOKEN_ADDRESS,
 } from "@/lib/config";
 import { resolveOnChainClients } from "@/lib/wagmi/on-chain-clients";
-import { SAMPLE_CAMPAIGN, SAMPLE_CSV } from "@/lib/sample/data";
+import {
+  SAMPLE_CAMPAIGN,
+  SAMPLE_CSV,
+  CAMPAIGN_PRESETS,
+  type CampaignPreset,
+} from "@/lib/sample/data";
+
 import { cn, formatNumber, shortAddress, toUnixSeconds } from "@/lib/utils";
 import {
   ArrowRight,
@@ -100,6 +106,22 @@ export default function AdminPage() {
     setCreated(null);
     setStatuses({});
   }
+
+  function loadPreset(preset: CampaignPreset) {
+    setName(preset.label);
+    setCampaignType(preset.campaignType);
+    setTotalBudget(preset.totalBudget);
+    setTokenAddress(CLOAKOPS_TOKEN_ADDRESS);
+    setNotes(preset.notes);
+    setClaimStart(defaultLocalDateTime(0));
+    setClaimEnd(defaultLocalDateTime(preset.claimWindowDays));
+    setCsvText(preset.csv);
+    setRecipientMode("csv");
+    setCreated(null);
+    setStatuses({});
+    setFormError(null);
+  }
+
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -203,7 +225,39 @@ export default function AdminPage() {
         {/* Left: form + CSV + recipients */}
         <div className="space-y-6 lg:col-span-2">
           <Card>
+            <CardHeader
+              title="Start from a preset"
+              subtitle="One click fills the whole form with a realistic, ready-to-launch example"
+              icon={<Sparkles className="h-4 w-4" />}
+            />
+            <CardBody>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {CAMPAIGN_PRESETS.map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => loadPreset(preset)}
+                    className="group rounded-lg border border-cloak-line bg-ink-900 px-3 py-2.5 text-left transition-colors hover:border-gold/60 hover:bg-gold/5"
+                  >
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-cloak-fg">
+                      {preset.label}
+                      <ArrowRight className="h-3 w-3 text-gold opacity-0 transition-opacity group-hover:opacity-100" />
+                    </p>
+
+                    <p className="text-xs text-cloak-muted">{preset.tagline}</p>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-cloak-faint">
+                Presets pre-fill everything — you still review, edit, and sign
+                before anything hits the chain.
+              </p>
+            </CardBody>
+          </Card>
+
+          <Card>
             <CardHeader title="Campaign details" subtitle="Public, verifiable metadata" />
+
             <CardBody className="space-y-4">
               <div>
                 <label className="label mb-1.5 block">Campaign name</label>

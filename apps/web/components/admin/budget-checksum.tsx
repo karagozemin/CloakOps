@@ -1,6 +1,7 @@
 import { cn, formatNumber } from "@/lib/utils";
 import { getBudgetCheck } from "@/lib/csv/budget-check";
-import { AlertTriangle, CheckCircle2, Lock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lock, PenLine } from "lucide-react";
+
 
 export function BudgetChecksum({
   totalAllocation,
@@ -56,7 +57,21 @@ export function BudgetChecksum({
             {recipientCount === 1 ? "" : "s"}. Checked before Zama encryption —
             individual amounts stay private on-chain.
           </p>
+          {recipientCount > 0 ? (
+            <p className="flex items-center gap-1.5 pt-0.5 text-cloak-faint">
+              <PenLine className="h-3 w-3 text-gold" />
+              <span>
+                {recipientCount} recipient{recipientCount === 1 ? "" : "s"} —{" "}
+                <span className="font-medium text-cloak-fg">
+                  still just 2 signatures
+                </span>{" "}
+                to launch. Encryption &amp; submission are batched, so payroll
+                for 4 or 400 costs you the same two clicks.
+              </span>
+            </p>
+          ) : null}
         </div>
+
         <div className="flex flex-wrap gap-2">
           <span className="chip">
             <Lock className="h-3 w-3 text-gold" />
