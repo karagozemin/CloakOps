@@ -45,8 +45,8 @@ export function SignatureSavings({
 
       <div className="mt-3 space-y-2.5">
         {/* Standard approach — scales linearly, shown dimmed + struck */}
-        <div className="flex items-center gap-3">
-          <div className="w-28 shrink-0 text-[11px] leading-tight text-cloak-faint">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-16 shrink-0 text-[11px] leading-tight text-cloak-faint sm:w-28">
             Standard airdrop
           </div>
           <div className="flex flex-1 items-center gap-2">
@@ -64,15 +64,15 @@ export function SignatureSavings({
                 </span>
               ) : null}
             </div>
-            <span className="w-24 shrink-0 text-right text-xs text-cloak-faint line-through decoration-cloak-danger/60">
-              {recipientCount} signature{recipientCount === 1 ? "" : "s"}
+            <span className="w-16 shrink-0 text-right text-xs text-cloak-faint line-through decoration-cloak-danger/60 sm:w-24">
+              {recipientCount} sig{recipientCount === 1 ? "" : "s"}
             </span>
           </div>
         </div>
 
         {/* CloakOps — flat at 2, highlighted */}
-        <div className="flex items-center gap-3">
-          <div className="w-28 shrink-0 text-[11px] font-medium leading-tight text-gold">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-16 shrink-0 text-[11px] font-medium leading-tight text-gold sm:w-28">
             CloakOps batch
           </div>
           <div className="flex flex-1 items-center gap-2">
@@ -85,8 +85,8 @@ export function SignatureSavings({
                 />
               ))}
             </div>
-            <span className="w-24 shrink-0 text-right text-xs font-semibold text-cloak-ok">
-              just 2 signatures
+            <span className="w-16 shrink-0 text-right text-xs font-semibold text-cloak-ok sm:w-24">
+              just 2 sigs
             </span>
           </div>
         </div>

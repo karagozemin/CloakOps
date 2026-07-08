@@ -7,6 +7,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, EmptyState } from "@/components/ui/empty";
 import { PublicSummary } from "@/components/campaign/public-summary";
+import { CopyLink } from "@/components/ui/copy-link";
 import { TokenOpsPanel } from "@/components/tokenops/tokenops-panel";
 import { useCampaign } from "@/lib/campaigns/hooks";
 import { findRecipient } from "@/lib/campaigns/store";
@@ -58,13 +59,14 @@ export default function CampaignDetailPage() {
         title={campaign.name}
         description={campaign.notes}
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link href={`/public-audit/${campaign.id}`} className="btn-ghost">
               Public audit
             </Link>
             <Link href="/claim" className="btn-subtle">
               Claim
             </Link>
+            <CopyLink value="/claim" label="Share claim link" />
           </div>
         }
       />

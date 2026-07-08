@@ -4,11 +4,19 @@
 
 <p align="center"><strong>Private allocations. Public rules. TokenOps execution.</strong></p>
 
-CloakOps is a **confidential campaign layer for TokenOps**, built on **Zama FHE**.
-Token teams run private rounds, contributor rewards, advisor vesting, and
-community distributions where **allocation amounts, tiers, and vesting metadata
+**Token distribution on a public chain leaks your company strategy.** Anyone can
+read transfers and vesting contracts to reverse-engineer who your biggest backers
+are, which contributors you rank highest, what your advisors negotiated, and when
+each party moves. That's competitive and personal intelligence, exposed by default.
+
+**CloakOps is a confidential operations layer on top of TokenOps**, built on
+**Zama FHE**. Token teams run private rounds, contributor rewards, advisor vesting,
+and community distributions where **allocation amounts, tiers, and vesting metadata
 stay encrypted on-chain** — while **campaign rules and totals remain publicly
-verifiable**.
+verifiable**. The headline capability: CloakOps funds **many** confidential
+stakeholders in a single, fixed-signature batch through Multicall3 — the
+multi-recipient flow the TokenOps dashboard can't yet do, on the same contract
+that can.
 
 > Built for the Zama Developer Program (Mainnet Season 3) — **Builder Track**
 > and the **TokenOps Special Bounty**.
@@ -47,6 +55,23 @@ payout amount is never revealed publicly.
 
 TokenOps provides the **campaign and distribution lifecycle rail**; CloakOps
 adds the **confidential metadata layer**.
+
+### End-to-end flow at a glance
+
+```mermaid
+flowchart LR
+    A["Admin browser<br/>Zama Relayer SDK"] -->|"encrypt euint64 / euint8"| B["ConfidentialCampaign.sol<br/>encrypted allocation + tier + vesting class<br/>(single source of truth)"]
+    B -->|"FHE.allow per recipient"| C["Recipient browser<br/>userDecrypt"]
+    C -->|"claim()"| D{"FHE tier bonus<br/>FHE.gt / FHE.select"}
+    D -->|"FHE.add (still encrypted)"| E["CloakConfidentialToken<br/>confidential balance (euint64)"]
+    B -->|"same encrypted amount"| F["TokenOps factory<br/>create + batchFund via Multicall3"]
+    F --> G["Per-recipient confidential<br/>vesting wallets"]
+```
+
+Everything left of the recipient stays encrypted end to end: the admin encrypts
+in-browser, the contract stores and computes on ciphertext, and only the recipient
+can decrypt their own row. The **same** encrypted allocation drives both the instant
+claim rail and the schedule-based TokenOps vesting rail.
 
 ### How the two settlement rails relate
 
@@ -224,9 +249,15 @@ Template: [`.env.example`](.env.example). No secrets are committed (both files a
 
 ## Limitations & roadmap
 
-- Claim credits a confidential `euint64` balance in `CloakConfidentialToken`
-  (testnet demo asset); it does not move pre-funded production tokens.
-- Recipient addresses, tx timing, and the admin address are visible on-chain.
+- **The claim rail is a live proof of the FHE payout primitive, not a mock.**
+  On Sepolia, a tier-3 recipient with a `25000` encrypted allocation claims and
+  receives a `27500` confidential balance — the `+10%` loyalty bonus is computed
+  on-chain with `FHE.gt` / `FHE.select` / `FHE.add` over ciphertext, and only the
+  recipient can decrypt the result. It credits `CloakConfidentialToken` (a testnet
+  demo asset) rather than moving pre-funded production tokens, but the encrypted
+  arithmetic and access control are the real, end-to-end mechanism.
+- Recipient addresses, tx timing, and the admin address are visible on-chain
+  (see the privacy model above — this is an honest MVP boundary, not a leak).
 - **Roadmap:** production ERC-7984 settlement via TokenOps rails, encrypted
   vesting enforcement on-chain, multi-admin campaigns.
 

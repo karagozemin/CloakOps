@@ -12,6 +12,7 @@ import { CsvEditor } from "@/components/admin/csv-editor";
 import { RecipientBuilder } from "@/components/admin/recipient-builder";
 import { BudgetChecksum } from "@/components/admin/budget-checksum";
 import { SignatureSavings } from "@/components/admin/signature-savings";
+import { CopyLink } from "@/components/ui/copy-link";
 import { ErrorNotice, WrongNetworkBanner } from "@/components/ui/error-notice";
 
 import { useZama } from "@/lib/zama";
@@ -520,22 +521,30 @@ export default function AdminPage() {
               {formError ? <ErrorNotice error={formError} context="tx" /> : null}
 
               {created ? (
-                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-cloak-ok/30 bg-cloak-ok/10 p-3">
-                  <Badge tone="ok" dot>
-                    Campaign #{created.onChainId} live
-                  </Badge>
-                  <Link
-                    href={`/campaign/${created.id}`}
-                    className="btn-subtle text-gold"
-                  >
-                    View campaign <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                  <Link
-                    href={`/public-audit/${created.id}`}
-                    className="btn-subtle"
-                  >
-                    Public audit
-                  </Link>
+                <div className="space-y-3 rounded-lg border border-cloak-ok/30 bg-cloak-ok/10 p-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Badge tone="ok" dot>
+                      Campaign #{created.onChainId} live
+                    </Badge>
+                    <Link
+                      href={`/campaign/${created.id}`}
+                      className="btn-subtle text-gold"
+                    >
+                      View campaign <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                    <Link
+                      href={`/public-audit/${created.id}`}
+                      className="btn-subtle"
+                    >
+                      Public audit
+                    </Link>
+                    <CopyLink value="/claim" label="Copy claim link" />
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-cloak-muted">
+                    Share the claim link with recipients — they connect the wallet
+                    you allocated to and decrypt their own values. The link is
+                    identical for everyone; eligibility is enforced on-chain.
+                  </p>
                 </div>
               ) : (
                 <button
@@ -633,8 +642,8 @@ function RecipientsPreview({
 
 
       {result.recipients.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-cloak-line">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto rounded-lg border border-cloak-line">
+          <table className="w-full min-w-[420px] text-left text-xs">
             <thead className="bg-ink-800 text-cloak-muted">
               <tr>
                 <th className="px-3 py-2 font-medium">Wallet</th>
